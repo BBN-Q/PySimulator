@@ -33,8 +33,6 @@ class SingleQubitRabi(unittest.TestCase):
         self.rabiFreq = 10e6
         self.pulseLengths = np.linspace(0,100e-9,40)
 
- 
-
     def tearDown(self):
         pass
 
@@ -57,10 +55,11 @@ class SingleQubitRabi(unittest.TestCase):
             
         results = simulate_sequence_stack(pulseSeqs, self.systemParams, np.array([[1,0],[0,0]]), simType='unitary')
     
-        plt.figure()
-        plt.plot(self.pulseLengths,results)
-        plt.title('10MHz Rabi Oscillations in Rotating Frame')
-        plt.show()
+        if plotResults:
+            plt.figure()
+            plt.plot(self.pulseLengths,results)
+            plt.title('10MHz Rabi Oscillations in Rotating Frame')
+            plt.show()
 
         np.testing.assert_allclose(results, np.cos(2*pi*self.rabiFreq*self.pulseLengths), atol = 1e-4)
 
@@ -84,15 +83,18 @@ class SingleQubitRabi(unittest.TestCase):
             
         results = simulate_sequence_stack(pulseSeqs, self.systemParams, np.array([[1,0],[0,0]], dtype=np.complex128), simType='unitary')
     
-        plt.figure()
-        plt.plot(self.pulseLengths,results)
-        plt.title('10MHz Rabi Oscillations using Interaction Frame')
-        plt.show()
+        if plotResults:
+            plt.figure()
+            plt.plot(self.pulseLengths,results)
+            plt.title('10MHz Rabi Oscillations using Interaction Frame')
+            plt.show()
 
         np.testing.assert_allclose(results, np.cos(2*pi*self.rabiFreq*self.pulseLengths), atol = 1e-4)
 
 
 
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
+    
+    plotResults = False
+    
     unittest.main()
