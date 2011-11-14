@@ -53,7 +53,7 @@ class SingleQubitRabi(unittest.TestCase):
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([pulseLength])
             tmpPulseSeq.maxTimeStep = pulseLength
-            tmpPulseSeq.H_int = Hamiltonian(2*pi*np.array([[0,0], [0, 0e9]], dtype = np.complex128))
+            tmpPulseSeq.H_int = None
             
             pulseSeqs.append(tmpPulseSeq)
             
