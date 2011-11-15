@@ -15,6 +15,7 @@ class SystemParams(object):
         '''
         self.controlHams = []
         self.numControlHams = 0
+        self.dissipators = None
         
         
     def add_control_ham(self, inphase = None, quadrature = None):

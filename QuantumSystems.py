@@ -96,6 +96,10 @@ class SCQubit(SNO):
         tmpMat[0,1] = -1j
         tmpMat[1,0] = 1j
         return tmpMat
+    
+    def T1Dissipator(self, T1=0):
+        ''' Create a T1 dissipator given a T1 value '''
+        return (1/np.sqrt(T1))*self.loweringOp()
         
         
     

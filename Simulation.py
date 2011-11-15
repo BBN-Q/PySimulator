@@ -9,14 +9,21 @@ import numpy as np
 import multiprocessing
 from functools import partial 
 
-from Evolution import evolution_unitary
+from Evolution import evolution_unitary, evolution_lindblad
 
 def simulate_sequence(pulseSeq=None, systemParams=None, rhoIn=None, simType='unitary'):
     
-    tmpU = evolution_unitary(pulseSeq, systemParams)
-    rhoOut = np.dot(np.dot(tmpU,rhoIn), tmpU.conj().transpose())
+    if simType == 'unitary':
+        tmpU = evolution_unitary(pulseSeq, systemParams)
+        rhoOut = np.dot(np.dot(tmpU,rhoIn), tmpU.conj().transpose())
+    elif simType == 'lindblad':
+        rhoOut = evolution_lindblad(pulseSeq, systemParams, rhoIn)
+    else:
+        raise NameError('Unknown simulation type.')
+    
+    #Return the expectation value of the measurement operator    
     return np.real(np.trace(np.dot(systemParams.measurement, rhoOut)))
-
+    
 def simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary'):
     
     #Setup a partial function that only takes the sequence
