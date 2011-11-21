@@ -27,23 +27,23 @@ if __name__ == '__main__':
     
     #Setup the Hermite polynomial 
     numPoints = 240
+    AWGFreq = 1.2e9
     x = np.linspace(-2,2,numPoints)
     #Hermite 180
-#    HermiteAmps = (1-0.956*x**2)*np.exp(-(x**2))
+#    pulseAmps = (1-0.956*x**2)*np.exp(-(x**2))
     #Hermite 90
-    HermiteAmps = (1-0.677*x**2)*np.exp(-(x**2))
-    
+    pulseAmps = (1-0.677*x**2)*np.exp(-(x**2))
+    #Gaussian
+#    pulseAmps = np.exp(-(x**2))
     #Setup the pulseSequences
     pulseSeqs = []
-#    controlAmp = 1.2/0.9
     freqs = np.linspace(-20e6,20e6,100)
-    controlAmp = 0.568/1.333
+    controlScale = 0.25/(np.sum(pulseAmps)*(1/AWGFreq))
     for offRes in freqs:
-    
         tmpPulseSeq = PulseSequence()
         tmpPulseSeq.add_control_line(freq=-offRes, initialPhase=0)
-        tmpPulseSeq.controlAmps = (10e6*controlAmp*HermiteAmps).reshape((1,numPoints))
-        tmpPulseSeq.timeSteps = (1/1.2e9)*np.ones(numPoints)
+        tmpPulseSeq.controlAmps = (controlScale*pulseAmps).reshape((1,numPoints))
+        tmpPulseSeq.timeSteps = (1/AWGFreq)*np.ones(numPoints)
         tmpPulseSeq.maxTimeStep = np.Inf
         tmpPulseSeq.H_int = None
         
