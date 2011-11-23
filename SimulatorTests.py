@@ -12,10 +12,9 @@ from scipy.constants import pi
 import matplotlib.pyplot as plt
 
 from SystemParams import SystemParams
-from Hamiltonian import Hamiltonian, Dissipator
 from PulseSequence import PulseSequence
 from Simulation import simulate_sequence_stack, simulate_sequence
-from QuantumSystems import SCQubit
+from QuantumSystems import SCQubit, Hamiltonian, Dissipator
 
 
 class SingleQubitRabi(unittest.TestCase):
