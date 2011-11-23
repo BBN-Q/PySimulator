@@ -6,7 +6,7 @@ Created on Nov 6, 2011
 
 import numpy as np
 
-from QuantumSystems import Interaction, expand_hilbert_space
+from QuantumSystems import Interaction, Hamiltonian, expand_hilbert_space
 
 class SystemParams(object):
     '''
@@ -48,6 +48,10 @@ class SystemParams(object):
         for ct,tmpSys in enumerate(self.subSystems):
             dims[ct] = tmpSys.dim
         return dims
+
+    @property 
+    def dim(self):
+        return np.prod(self.subSystemDims)
     
     @property
     def subSystemNames(self):
@@ -73,18 +77,19 @@ class SystemParams(object):
     
     def create_full_Ham(self):
         ''' Create the full Hamiltonian with all the interactions'''
-        sysDim = np.prod(self.subSystemDims)
-        self.Hnat = np.zeros((sysDim,sysDim), dtype=np.complex128)
+        Hnat = np.zeros((self.dim,self.dim), dtype=np.complex128)
         
         #Loop over all the sub-system self Hamiltonians
         for tmpNam, tmpSys in zip(self.subSystemNames, self.subSystems):
-            self.Hnat += self.expand_operator(tmpNam, tmpSys.Hnat)
+            Hnat += self.expand_operator(tmpNam, tmpSys.Hnat)
         
         #Loop over all inter-system interactions
         for tmpInteraction in self.interactions:
             sys1Pos = self.find_subsystem_pos(tmpInteraction.system1.name)
             sys2Pos = self.find_subsystem_pos(tmpInteraction.system2.name)
-            self.Hnat += expand_hilbert_space(tmpInteraction.matrix, np.array([sys1Pos, sys2Pos]), np.setxor1d([sys1Pos, sys2Pos], np.arange(self.numSubSystems)), self.subSystemDims)
+            Hnat += expand_hilbert_space(tmpInteraction.matrix, np.array([sys1Pos, sys2Pos]), np.setxor1d([sys1Pos, sys2Pos], np.arange(self.numSubSystems)), self.subSystemDims)
+        
+        self.Hnat = Hamiltonian(Hnat)
         
 if __name__ == '__main__':
     
@@ -99,7 +104,7 @@ if __name__ == '__main__':
     print(tmpSystem.subSystemDims)
     print(tmpSystem.expand_operator('Q1', Q1.Hnat))
     tmpSystem.create_full_Ham()
-    print(tmpSystem.Hnat)
+    print(tmpSystem.Hnat.matrix)
         
     
         

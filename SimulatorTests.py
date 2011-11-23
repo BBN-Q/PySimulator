@@ -23,11 +23,11 @@ class SingleQubitRabi(unittest.TestCase):
     def setUp(self):
         #Setup the system
         self.systemParams = SystemParams()
-        self.qubit = SCQubit(2,0e9)
-        self.systemParams.Hnat = Hamiltonian(2*pi*self.qubit.Hnat())
-        self.systemParams.add_control_ham(inphase = Hamiltonian(pi*(self.qubit.loweringOp() + self.qubit.raisingOp())), quadrature = Hamiltonian(-pi*(-1j*self.qubit.loweringOp() + 1j*self.qubit.raisingOp())))
-        self.systemParams.dim = 2
-        self.systemParams.measurement = -self.qubit.pauliZ()
+        self.qubit = SCQubit(2,0e9, 'Q1')
+        self.systemParams.add_sub_system(self.qubit)
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp() + self.qubit.raisingOp())), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp() + 1j*self.qubit.raisingOp())))
+        self.systemParams.measurement = -self.qubit.pauliZ
+        self.systemParams.create_full_Ham()
         
         #Define Rabi frequency and pulse lengths
         self.rabiFreq = 10e6
@@ -56,7 +56,7 @@ class SingleQubitRabi(unittest.TestCase):
             tmpPulseSeq.H_int = None
             
             pulseSeqs.append(tmpPulseSeq)
-            
+        
         results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
     
         if plotResults:
@@ -73,7 +73,8 @@ class SingleQubitRabi(unittest.TestCase):
         '''
         
         #Setup the system
-        self.systemParams.Hnat = Hamiltonian(2*pi*np.array([[0,0], [0, 5e9]], dtype = np.complex128))
+        self.systemParams.subSystems[0] = SCQubit(2,5e9, 'Q1')
+        self.systemParams.create_full_Ham()
         
         #Setup the pulseSequences
         pulseSeqs = []
@@ -84,7 +85,7 @@ class SingleQubitRabi(unittest.TestCase):
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([pulseLength])
             tmpPulseSeq.maxTimeStep = pi/2*1e-10
-            tmpPulseSeq.H_int = Hamiltonian(2*pi*np.array([[0,0], [0, 5.005e9]], dtype = np.complex128))
+            tmpPulseSeq.H_int = Hamiltonian(np.array([[0,0], [0, 5.005e9]], dtype = np.complex128))
             
             pulseSeqs.append(tmpPulseSeq)
             

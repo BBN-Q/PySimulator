@@ -21,7 +21,7 @@ class Hamiltonian(object):
         self.dim = mat.shape[0] if mat is not None else 0
         
         
-    def move2interaction_frame(self, transformMat):
+    def calc_interaction_frame(self, transformMat):
         '''
         Helper function to move into an interaction frame 
         '''

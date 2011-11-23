@@ -6,6 +6,11 @@ Created on Nov 8, 2011
 
 import numpy as np
 
+from scipy.constants import pi
+
+from scipy.linalg import expm
+
+
 class QuantumSystem(object):
     '''
     A generic quantum system container
@@ -112,46 +117,63 @@ class Hamiltonian(object):
     '''
     A generic Hamiltonian class including utilities for changing representations
     '''
-
-
-    def __init__(self, mat = None):
+    def __init__(self, matrix = None):
         '''
         Constructor
         '''
-        self.mat = mat
-        self.dim = mat.shape[0] if mat is not None else 0
+        self.matrix = matrix
+        self.interactionMatrix = None
+        self.dim = matrix.shape[0] if matrix is not None else 0
         
-        
-    def move2interaction_frame(self, transformMat):
+    def __add__(self, other):
+        ''' Overload + operator '''
+        #First check for matrix property
+        try:
+            return Hamiltonian(self.matrix + other.matrix)
+        #Otherwise just try to add it
+        except AttributeError:
+            return Hamiltonian(self.matrix + other)
+    
+    def __iadd__(self, other):
+        ''' Overload += operator '''
+        try:
+            self.matrix += other.matrix
+        except AttributeError:
+            self.matrix += other
+        return self
+            
+    def calc_interaction_frame(self, interactionHam, time):
         '''
         Helper function to move into an interaction frame 
         '''
-        return np.dot(np.dot(transformMat,self.Hlab),transformMat.conj().transpose())
+        transformMat = expm((1j*2*pi*time)*interactionHam.matrix); 
+        self.interactionMatrix = np.dot(np.dot(transformMat,self.matrix),transformMat.conj().transpose()) - interactionHam.matrix
     
     def superOpColStack(self):
         '''
         Return the super-operator for Lindbladian dyanamics column-stacked
         '''
         tmpEye = np.eye(self.dim)
-        return np.kron(self.mat.conj(), tmpEye) - np.kron(tmpEye, self.mat)
+        return np.kron(self.matrix.conj(), tmpEye) - np.kron(tmpEye, self.matrix)
     
 class Dissipator(object):
     '''
-    A generic Lindladian dissipator class
+    A generic Lindladian dissipator class with representation utilities
     '''
     def __init__(self, mat = None):
         '''
         Constructor
         '''
-        self.mat = mat
+        self.matrix = mat
         self.dim = mat.shape[0] if mat is not None else 0
         
-    def superOpColStack(self):
+    def superOpColStack(self, interactionMatrix=False):
         '''
         Return the super-operator for Lindbladian dynamics column-stacked.
         '''
         tmpEye = np.eye(self.dim)
-        return np.kron(self.mat.conj(), self.mat) -0.5*np.kron(tmpEye, np.dot(self.mat.conj().transpose(), self.mat)) - 0.5*np.kron(np.dot(np.transpose(self.mat), self.mat.conj()), tmpEye)
+        tmpMat = self.interactionMatrix if interactionMatrix else self.matrix
+        return np.kron(tmpMat.conj(), tmpMat) -0.5*np.kron(tmpEye, np.dot(tmpMat.conj().transpose(), tmpMat)) - 0.5*np.kron(np.dot(tmpMat.transpose(), tmpMat.conj()), tmpEye)
      
     
 class Interaction(object):
@@ -177,7 +199,6 @@ class Interaction(object):
                 raise NameError('Unknown interaction type.')
     
             
-
 def expand_hilbert_space(operator, operatorSubSystems, eyeSubSystems, dimensions):
     ''' 
     Helper function for expanding an subsystem operator into the full Hilbert space.
