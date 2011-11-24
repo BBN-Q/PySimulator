@@ -11,7 +11,7 @@ from functools import partial
 
 import time
 
-from progressbar import Percentage, Bar, ProgressBar
+from progressbar import Percentage, Bar, ProgressBar, ETA
 
 from Evolution import evolution_unitary, evolution_lindblad
 
@@ -43,11 +43,12 @@ def simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary'):
     pool.close()
     
     numSeqs = len(pulseSeqs)
-    pbar = ProgressBar(widgets=[Percentage(), Bar()], maxval=numSeqs).start()
+    pbar = ProgressBar(widgets=[Percentage(), Bar(), ETA()], maxval=numSeqs).start()
   
     while True:
         if not results.ready():
             pbar.update(numSeqs-results._number_left)
+            time.sleep(0.1)
         else:
             break
     
