@@ -10,7 +10,12 @@ Functions for evolving the pulse sequence
 import numpy as np
 from numpy import sin, cos,pi
 
+from scipy.constants import pi
 from scipy.linalg import expm
+
+from QuantumSystems import Hamiltonian
+
+from copy import deepcopy
 
 def evolution_unitary(pulseSequence, systemParams):
     '''
@@ -29,27 +34,30 @@ def evolution_unitary(pulseSequence, systemParams):
             subTimeStep = np.minimum(timeStep-tmpTime, pulseSequence.maxTimeStep)
 
             #Initialize the Hamiltonian to the drift Hamiltonian
-            Htot = np.copy(systemParams.Hnat.mat)
+            Htot = deepcopy(systemParams.Hnat)
             
             #Add each of the control Hamiltonians
             for controlct, tmpControl in enumerate(pulseSequence.controlLines):
                 tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.initialPhase
                 if tmpControl.controlType == 'rotating':
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].mat + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].mat
+                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix
+                elif tmpControl.controlType == 'sinusoidal':
+                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix
                 else:
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].mat
-                Htot += pulseSequence.controlAmps[controlct,timect]*tmpMat
-            
+                    raise TypeError('Unknown control type.')
+                tmpMat *= pulseSequence.controlAmps[controlct,timect]
+                Htot += tmpMat
+
             if pulseSequence.H_int is not None:
-                #Calculate the current interaction frame transformation
-                transformMat = expm((1j*curTime)*pulseSequence.H_int.mat); 
-            
                 #Move the total Hamiltonian into the interaction frame
-                Htot = np.dot(np.dot(transformMat,Htot),transformMat.conj().transpose()) - pulseSequence.H_int.mat
-                
-            #Propagate the unitary
-            totU = np.dot(expm(-1j*subTimeStep*Htot),totU)
+                Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
+                #Propagate the unitary
+                totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.interactionMatrix),totU)
+            else:
+                #Propagate the unitary
+                totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.matrix),totU)
             
+            #Update the times
             tmpTime += subTimeStep
             curTime += subTimeStep
             
@@ -67,8 +75,7 @@ def evolution_lindblad(pulseSequence, systemParams, rhoIn):
     Main function for evolving a state under unitary conditions
     '''
     
-    #Setup the super operators for the drift Hamiltonian and lindladian
-    supHdrift = systemParams.Hnat.superOpColStack()
+    #Setup the super operators for the dissipators
     
     supDis = np.zeros((systemParams.dim**2, systemParams.dim**2), dtype=np.complex128)
     for tmpDis in systemParams.dissipators:
@@ -86,31 +93,31 @@ def evolution_lindblad(pulseSequence, systemParams, rhoIn):
             #Choose the minimum of the time left or the sub pixel timestep
             subTimeStep = np.minimum(timeStep-tmpTime, pulseSequence.maxTimeStep)
 
-            #Initialize the Hamiltonian super operator to the drift Hamiltonian
-            supHtot = np.copy(supHdrift)
+            #Initialize the Hamiltonian to the drift Hamiltonian
+            Htot = deepcopy(systemParams.Hnat)
             
             #Add each of the control Hamiltonians
             for controlct, tmpControl in enumerate(pulseSequence.controlLines):
                 tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.initialPhase
                 if tmpControl.controlType == 'rotating':
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].mat + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].mat
+                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix
                 elif tmpControl.controlType == 'sinusoidal':
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].mat
+                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix
                 else:
                     raise TypeError('Unknown control type.')
-                    
-                if pulseSequence.H_int is not None:
-                    #Calculate the current interaction frame transformation
-                    transformMat = expm((1j*curTime)*pulseSequence.H_int.mat); 
-                
-                    #Move the total Hamiltonian into the interaction frame
-                    tmpMat = np.dot(np.dot(transformMat,tmpMat),transformMat.conj().transpose()) - pulseSequence.H_int.mat
-                       
-                supHtot += pulseSequence.controlAmps[controlct,timect]*tmpMat
+                tmpMat *= pulseSequence.controlAmps[controlct,timect]
+                Htot += tmpMat
+               
+            if pulseSequence.H_int is not None:
+                #Move the total Hamiltonian into the interaction frame
+                Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
+                supHtot = Htot.superOpColStack(interactionMatrix=True)
+            else:
+                supHtot = Htot.superOpColStack()
             
-                 
+            
             #Propagate the unitary
-            totF = np.dot(expm(subTimeStep*(-1j*supHtot + supDis)),totF)
+            totF = np.dot(expm(subTimeStep*(-1j*2*pi*supHtot + supDis)),totF)
             
             tmpTime += subTimeStep
             curTime += subTimeStep
