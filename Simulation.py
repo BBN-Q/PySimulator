@@ -9,6 +9,10 @@ import numpy as np
 import multiprocessing
 from functools import partial 
 
+import time
+
+from progressbar import Percentage, Bar, ProgressBar, ETA
+
 from Evolution import evolution_unitary, evolution_lindblad
 
 def simulate_sequence(pulseSeq=None, systemParams=None, rhoIn=None, simType='unitary'):
@@ -33,14 +37,24 @@ def simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary'):
     pool = multiprocessing.Pool()
     
     #Map all the pulse sequences into a results list in parallel
-    results = pool.map(partial_simulate_sequence, pulseSeqs, 1)
+    results = pool.map_async(partial_simulate_sequence, pulseSeqs, 1)
     
-    #Bring the threads back together 
+    #Close the pool to new jobs 
     pool.close()
-    pool.join()
     
-    #Convert back from a list to a numpy array. 
-    results = np.array(results, dtype=np.float64)
+    numSeqs = len(pulseSeqs)
+    pbar = ProgressBar(widgets=[Percentage(), Bar(), ETA()], maxval=numSeqs).start()
+  
+    while True:
+        if not results.ready():
+            pbar.update(numSeqs-results._number_left)
+            time.sleep(0.1)
+        else:
+            break
+    
+    pbar.finish()
+            
+    #Extract the results into a numpy array. 
+    return np.array(results.get(), dtype=np.float64)
         
-    return results
         

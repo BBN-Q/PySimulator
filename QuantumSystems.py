@@ -81,8 +81,10 @@ class SCQubit(SNO):
     '''
     A class for superconducting qubits based on non-linear oscillators
     '''
-    def __init__(self, numLevels = 0, omega = 0, delta = 0, name=None):
+    def __init__(self, numLevels = 0, omega = 0, delta = 0, name=None, T1=np.Inf, T2 = np.Inf):
         super(SCQubit, self).__init__(numLevels, omega, delta, name=name)
+        self.T1 = T1
+        self.T2 = T2
 
     #Define some effective spin operators in the qubit manifold (lowest two levels)
     @property
@@ -109,9 +111,11 @@ class SCQubit(SNO):
         tmpMat[1,0] = 1j
         return tmpMat
     
-    def T1Dissipator(self, T1=0):
+    @property
+    def T1Dissipator(self):
         ''' Create a T1 dissipator given a T1 value '''
-        return (1/np.sqrt(T1))*self.loweringOp
+        return (1/np.sqrt(self.T1))*self.loweringOp
+    
         
         
         
