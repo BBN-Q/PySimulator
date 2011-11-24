@@ -81,7 +81,7 @@ class SystemParams(object):
         
         #Loop over all the sub-system self Hamiltonians
         for tmpNam, tmpSys in zip(self.subSystemNames, self.subSystems):
-            Hnat += self.expand_operator(tmpNam, tmpSys.Hnat)
+            Hnat += self.expand_operator(tmpNam, tmpSys.Hnat.matrix)
         
         #Loop over all inter-system interactions
         for tmpInteraction in self.interactions:

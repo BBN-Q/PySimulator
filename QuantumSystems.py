@@ -52,14 +52,16 @@ class SNO(QuantumSystem):
             else:
                 Hnat[ct,ct] = ct*self.omega + self.delta*(ct-1)*ct/2.0
     
-        return Hnat
+        return Hamiltonian(Hnat)
     
+    @property
     def raisingOp(self):
         '''
         Create the raising operator under the linear harmonic oscillator function. This may not be true with a cavity.
         '''
         return np.diag(np.sqrt(np.arange(1,self.dim, dtype=np.complex128)), -1)
-                             
+    
+    @property                
     def loweringOp(self):
         '''
         Create the lowering operator under the linear harmonic oscillator function. This may not be true with a cavity.
@@ -109,7 +111,7 @@ class SCQubit(SNO):
     
     def T1Dissipator(self, T1=0):
         ''' Create a T1 dissipator given a T1 value '''
-        return (1/np.sqrt(T1))*self.loweringOp()
+        return (1/np.sqrt(T1))*self.loweringOp
         
         
         
@@ -149,12 +151,13 @@ class Hamiltonian(object):
         transformMat = expm((1j*2*pi*time)*interactionHam.matrix); 
         self.interactionMatrix = np.dot(np.dot(transformMat,self.matrix),transformMat.conj().transpose()) - interactionHam.matrix
     
-    def superOpColStack(self):
+    def superOpColStack(self, interactionMatrix=False):
         '''
         Return the super-operator for Lindbladian dyanamics column-stacked
         '''
         tmpEye = np.eye(self.dim)
-        return np.kron(self.matrix.conj(), tmpEye) - np.kron(tmpEye, self.matrix)
+        tmpMat = self.interactionMatrix if interactionMatrix else self.matrix
+        return np.kron(tmpMat.conj(), tmpEye) - np.kron(tmpEye, tmpMat)
     
 class Dissipator(object):
     '''
@@ -167,13 +170,12 @@ class Dissipator(object):
         self.matrix = mat
         self.dim = mat.shape[0] if mat is not None else 0
         
-    def superOpColStack(self, interactionMatrix=False):
+    def superOpColStack(self):
         '''
         Return the super-operator for Lindbladian dynamics column-stacked.
         '''
         tmpEye = np.eye(self.dim)
-        tmpMat = self.interactionMatrix if interactionMatrix else self.matrix
-        return np.kron(tmpMat.conj(), tmpMat) -0.5*np.kron(tmpEye, np.dot(tmpMat.conj().transpose(), tmpMat)) - 0.5*np.kron(np.dot(tmpMat.transpose(), tmpMat.conj()), tmpEye)
+        return np.kron(self.matrix.conj(), self.matrix) -0.5*np.kron(tmpEye, np.dot(self.matrix.conj().transpose(), self.matrix)) - 0.5*np.kron(np.dot(self.matrix.transpose(), self.matrix.conj()), tmpEye)
      
     
 class Interaction(object):
@@ -194,7 +196,7 @@ class Interaction(object):
         if self.matrix is None:
             #Work it out for different interaction types
             if self.interactionType == 'ZZ':
-                self.matrix = self.interactionStrength*np.kron(self.system1.pauliZ, self.system2.pauliZ)
+                self.matrix = 0.25*self.interactionStrength*np.kron(self.system1.pauliZ, self.system2.pauliZ)
             else:
                 raise NameError('Unknown interaction type.')
     

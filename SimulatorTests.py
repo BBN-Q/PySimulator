@@ -17,15 +17,15 @@ from Simulation import simulate_sequence_stack, simulate_sequence
 from QuantumSystems import SCQubit, Hamiltonian, Dissipator
 
 
-class SingleQubitRabi(unittest.TestCase):
+class SingleQubit(unittest.TestCase):
 
 
     def setUp(self):
         #Setup the system
         self.systemParams = SystemParams()
-        self.qubit = SCQubit(2,0e9, 'Q1')
+        self.qubit = SCQubit(2,0e9, name='Q1')
         self.systemParams.add_sub_system(self.qubit)
-        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp() + self.qubit.raisingOp())), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp() + 1j*self.qubit.raisingOp())))
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
         self.systemParams.measurement = -self.qubit.pauliZ
         self.systemParams.create_full_Ham()
         
@@ -127,9 +127,127 @@ class SingleQubitRabi(unittest.TestCase):
             plt.show()
         
         np.testing.assert_allclose(results, 1-2*np.exp(-delays/1e-6), atol=1e-4)
+        
+class SingleQutrit(unittest.TestCase):
+
+    def setUp(self):
+        #Setup the system
+        self.systemParams = SystemParams()
+        self.qubit = SCQubit(3, 5e9, -100e6, name='Q1')
+        self.systemParams.add_sub_system(self.qubit)
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
+        self.systemParams.measurement = -self.qubit.pauliZ
+        self.systemParams.create_full_Ham()
+        
+        #Add the 2us T1 dissipator
+        self.systemParams.dissipators = [Dissipator(self.qubit.T1Dissipator(2e-6))]
+
+        #Define the initial state as the ground state
+        self.rhoIn = self.qubit.levelProjector(0)
+
+    def tearDown(self):
+        pass
+
+
+    def testTwoPhoton(self):
+        
+        '''
+        Test spectroscopy and the two photon transition from the ground to the second excited state.
+        '''
+        
+        freqSweep = 1e9*np.linspace(4.9, 5.1, 1000)
+        rabiFreq = 1e6
+        
+        #Setup the pulseSequences as a series of 10us low-power pulses
+        pulseSeqs = []
+        for freq in freqSweep:
+            tmpPulseSeq = PulseSequence()
+            tmpPulseSeq.add_control_line(freq=freq, initialPhase=0)
+            tmpPulseSeq.controlAmps = np.array([[rabiFreq]], dtype=np.float64)
+            tmpPulseSeq.timeSteps = np.array([10e-6])
+            tmpPulseSeq.maxTimeStep = np.Inf
+            tmpPulseSeq.H_int = Hamiltonian(np.diag(freq*np.arange(3, dtype=np.complex128)))
+            
+            pulseSeqs.append(tmpPulseSeq)
+        
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')
+
+        if plotResults:        
+            plt.figure()
+            plt.plot(freqSweep/1e9,results)
+            plt.xlabel('Frequency')
+            plt.ylabel(r'$\sigma_z$')
+            plt.title('Qutrit Spectroscopy')
+            plt.show()
+
+
+class TwoQubit(unittest.TestCase):
+
+
+    def setUp(self):
+        #Setup a simple non-coupled two qubit system
+        self.systemParams = SystemParams()
+        self.Q1 = SCQubit(2, 5e9, name='Q1')
+        self.systemParams.add_sub_system(self.Q1)
+        self.Q2 = SCQubit(2, 6e9, name='Q2')
+        self.systemParams.add_sub_system(self.Q2)
+        X = 0.5*(self.Q1.loweringOp + self.Q1.raisingOp)
+        Y = -0.5*(-1j*self.Q1.loweringOp + 1j*self.Q2.raisingOp)
+        self.systemParams.add_control_ham(inphase = Hamiltonian(self.systemParams.expand_operator('Q1', X)), quadrature = Hamiltonian(self.systemParams.expand_operator('Q1', Y)))
+        self.systemParams.add_control_ham(inphase = Hamiltonian(self.systemParams.expand_operator('Q2', X)), quadrature = Hamiltonian(self.systemParams.expand_operator('Q2', Y)))
+        self.systemParams.measurement = -self.systemParams.expand_operator('Q1', self.Q1.pauliZ) - self.systemParams.expand_operator('Q2', self.Q2.pauliZ)
+        self.systemParams.create_full_Ham()
+        
+        #Define Rabi frequency and pulse lengths
+        self.rabiFreq = 10e6
+        
+        #Define the initial state as the ground state
+        self.rhoIn = np.zeros((self.systemParams.dim, self.systemParams.dim))
+        self.rhoIn[0,0] = 1
+
+    def tearDown(self):
+        pass
+
+    def testZZGate(self):
+        '''Test whether the ZZ interaction performs as expected'''
+        
+        #Take the bare Hamiltonian as the interaction Hamiltonian
+        H_int = Hamiltonian(self.systemParams.Hnat.matrix)
+        
+        #First add a 2MHz ZZ interaction and add it to the system
+        self.systemParams.add_interaction('Q1', 'Q2', 'ZZ', 2e6)
+        self.systemParams.create_full_Ham()
+        
+        #Setup the pulseSequences
+        delays = np.linspace(0,4e-6,100)
+        pulseSeqs = []
+        for delay in delays:
+            tmpPulseSeq = PulseSequence()
+            tmpPulseSeq.add_control_line(freq=5.0e9, initialPhase=0)
+            tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0], [0,0]], dtype=np.float64)
+            tmpPulseSeq.timeSteps = np.array([25e-9, delay])
+            tmpPulseSeq.maxTimeStep = np.Inf
+            tmpPulseSeq.H_int = H_int
+ 
+            pulseSeqs.append(tmpPulseSeq)
+        
+        self.systemParams.measurement = np.kron(self.Q1.pauliX, self.Q2.pauliZ)
+        resultsXZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+        self.systemParams.measurement = np.kron(self.Q1.pauliY, self.Q2.pauliZ)
+        resultsYZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+
+        if plotResults:
+            plt.figure()
+            plt.plot(delays*1e6, resultsXZ)
+            plt.plot(delays*1e6, resultsYZ, 'g')
+            plt.legend(('XZ','YZ'))
+            plt.xlabel('Coupling Time')
+            plt.ylabel('Operator Expectation Value')
+            plt.title('ZZ Coupling Evolution After a X90 on Q1')
+            plt.show()
 
 if __name__ == "__main__":
     
-    plotResults = False
+    plotResults = True
     
     unittest.main()
