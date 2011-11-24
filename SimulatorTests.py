@@ -23,7 +23,7 @@ class SingleQubit(unittest.TestCase):
     def setUp(self):
         #Setup the system
         self.systemParams = SystemParams()
-        self.qubit = SCQubit(2,0e9, name='Q1')
+        self.qubit = SCQubit(2,0e9, name='Q1', T1=1e-6)
         self.systemParams.add_sub_system(self.qubit)
         self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
         self.systemParams.measurement = -self.qubit.pauliZ
@@ -103,7 +103,7 @@ class SingleQubit(unittest.TestCase):
         '''
         Test a simple T1 recovery without any pulses.  Start in the first excited state and watch recovery down to ground state.
         '''
-        self.systemParams.dissipators = [Dissipator(self.qubit.T1Dissipator(1e-6))]
+        self.systemParams.dissipators = [Dissipator(self.qubit.T1Dissipator)]
         
         #Just setup a series of delays
         delays = np.linspace(0,5e-6,40)
@@ -133,14 +133,14 @@ class SingleQutrit(unittest.TestCase):
     def setUp(self):
         #Setup the system
         self.systemParams = SystemParams()
-        self.qubit = SCQubit(3, 5e9, -100e6, name='Q1')
+        self.qubit = SCQubit(3, 5e9, -100e6, name='Q1', T1=2e-6)
         self.systemParams.add_sub_system(self.qubit)
         self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
         self.systemParams.measurement = -self.qubit.pauliZ
         self.systemParams.create_full_Ham()
         
         #Add the 2us T1 dissipator
-        self.systemParams.dissipators = [Dissipator(self.qubit.T1Dissipator(2e-6))]
+        self.systemParams.dissipators = [Dissipator(self.qubit.T1Dissipator)]
 
         #Define the initial state as the ground state
         self.rhoIn = self.qubit.levelProjector(0)
