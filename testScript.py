@@ -71,7 +71,7 @@ if __name__ == '__main__':
     systemParams.add_sub_system(Q2)
  
     #Add a 2MHz ZZ interaction 
-    systemParams.add_interaction('Q1', 'Q2', 'ZZ', 2e6)
+    systemParams.add_interaction('Q1', 'Q2', 'ZZ', 0e6)
    
     #Create the full Hamiltonian   
     systemParams.create_full_Ham()
@@ -88,7 +88,8 @@ if __name__ == '__main__':
     
     #Setup the measurement operator
 #    systemParams.measurement = -systemParams.expand_operator('Q1', Q1.pauliZ) - systemParams.expand_operator('Q2', Q2.pauliZ)
-    systemParams.measurement = -systemParams.expand_operator('Q1', Q1.pauliZ)
+    systemParams.measurement = 0.6057*np.eye(9) + 0.0176*systemParams.expand_operator('Q1', Q1.pauliZ) + 0.0155*systemParams.expand_operator('Q2', Q2.pauliZ) - 0.0074*np.kron(Q1.pauliZ, Q2.pauliZ)
+
     #Add the T1 dissipators
     systemParams.dissipators.append(Dissipator(systemParams.expand_operator('Q1', Q1.T1Dissipator)))
     systemParams.dissipators.append(Dissipator(systemParams.expand_operator('Q2', Q2.T1Dissipator)))
@@ -98,35 +99,37 @@ if __name__ == '__main__':
     rhoIn[0,0] = 1
 
     #First run 1D spectroscopy around the Bell-Rabi drive frequency
-    freqSweep = 1e9*np.linspace(4.855, 4.865, 200)
-#    freqSweep = [5.024e9]
-#    ampSweep = np.linspace(-1,1,40)
-    x = np.linspace(-2,2,30)
+    freqSweep = 1e9*np.linspace(5.00, 5.030, 30)
+#    freqSweep = [5.023e9]
+    ampSweep = np.linspace(-1,1,80)
+    x = np.linspace(-2,2,120)
     pulseAmps = (np.exp(-x**2)).reshape((1,x.size))
-    ampSweep = [1]
+#    ampSweep = [1]
     
-    rabiFreq = 10e6
+    rabiFreq = 150e6
     
-    #Setup the pulseSequences as a series of 10us low-power pulses at different frequenciess
+    #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
     pulseSeqs = []
     for freq in freqSweep:
         for controlAmp in ampSweep:
             tmpPulseSeq = PulseSequence()
             tmpPulseSeq.add_control_line(freq=freq, initialPhase=0)
-            tmpPulseSeq.controlAmps = rabiFreq*pulseAmps
-            tmpPulseSeq.timeSteps = 50e-9*np.ones(x.size)
+            tmpPulseSeq.controlAmps = rabiFreq*controlAmp*pulseAmps
+            tmpPulseSeq.timeSteps = 5e-9*np.ones(x.size)
             tmpPulseSeq.maxTimeStep = 1e-6
             tmpMat = np.diag(freq*np.arange(3, dtype=np.complex128))
             tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', tmpMat) + systemParams.expand_operator('Q2', tmpMat))
         
             pulseSeqs.append(tmpPulseSeq)
     
-    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='lindblad')
-
+    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')
+    results.resize((freqSweep.size, ampSweep.size))
+    
     plt.figure()
-    plt.plot(freqSweep/1e9,results)
-    plt.xlabel('Frequency')
-    plt.ylabel('Measurement Voltage')
-    plt.title('Two Qubit Bell-Rabi Spectroscopy')
+#    plt.plot(ampSweep, results)
+#    plt.xlabel('Frequency')
+#    plt.ylabel('Measurement Voltage')
+#    plt.title('Two Qubit Bell-Rabi Spectroscopy')
+    plt.imshow(results, extent = [-1, 1, freqSweep[-1], freqSweep[0]], aspect='auto')
     plt.show()
 
