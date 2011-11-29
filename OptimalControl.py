@@ -17,6 +17,8 @@ from scipy.linalg import expm
 
 from scipy.optimize import fmin_tnc, tnc
 
+import scipy.signal
+
 from PulseSequence import PulseSequence
 from QuantumSystems import Hamiltonian
 
@@ -29,14 +31,15 @@ class PulseOptimParams(PulseSequence):
         self.numChannels = 0
         self.numPoints = 0
         self.startPulse = None
-
+        self.ramps = None
+        self.maxControlAmps = None
 
 def create_random_pulse(numChannels, numPoints):
     '''
     Helper function to create smooth pulse starting point.
     '''
     #TODO: return something besides ones
-    return 10e6*np.ones((numChannels, numPoints))
+    return 5e6*np.ones((numChannels, numPoints))
 
 
 def calc_control_Hams(optimParamsuence, systemParams):
@@ -91,7 +94,7 @@ def evolution_unitary(optimParams, systemParams, controlHams):
         Htot = deepcopy(systemParams.Hnat)
         
         #Add each of the control Hamiltonians
-        for controlct, tmpControl in enumerate(optimParams.controlLines):
+        for controlct in range(optimParams.numControlLines):
             Htot += optimParams.controlAmps[controlct, timect]*controlHams[controlct, timect]
 
         if optimParams.H_int is not None:
@@ -191,7 +194,7 @@ def optimize_pulse(optimParams, systemParams):
     
     #Create the initial pulse
     if optimParams.controlAmps is None:
-        curPulse = create_random_pulse(optimParams.numControls, optimParams.numTimeSteps)
+        curPulse = create_random_pulse(optimParams.numControlLines, optimParams.numTimeSteps)
     else:
         curPulse = optimParams.controlAmps
     
@@ -200,27 +203,48 @@ def optimize_pulse(optimParams, systemParams):
 
     #Create some helper functions for the goodness and derivative evaluation
     def tmpEvalPulse(pulseIn):
-        optimParams.controlAmps = pulseIn.reshape((optimParams.numControls, optimParams.numTimeSteps))
+        optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
         return eval_pulse(optimParams, systemParams, controlHams_int)
         
     def tmpEvalDerivs(pulseIn):
-        optimParams.controlAmps = pulseIn.reshape((optimParams.numControls, optimParams.numTimeSteps))
+        optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
         return eval_derivs(optimParams, systemParams, controlHams_int)
     
-    #TODO: Create the bounds 
-    #We can use these to take into account power limits and to squeeze the pulse down to zero and the start and finish
-#    bounds = [(-1e6, 1e6) for ct in curPulse.flatten()]
+    #We can use these to take into account power limits and to squeeze the pulse down to zero and the start and finish for finite bandwidth concerns
+    #We'll use a Gaussian filter to achieve a ramp up and ramp down on the pulse edges 
+    #Setup bounds at the maximum drive frequency
+    timeStep = optimParams.timeSteps[0]
+    tmpBounds = np.inf*np.ones_like(curPulse, dtype=np.float64)
+    for controlct, tmpControl in enumerate(optimParams.controlLines):
+        if tmpControl.bandwidth < np.inf:
+            #If the bandwidth is defined as the -3dB point and the frequency response is defined as exp(-(pi*f)**2/alpha then alpha = (pi*f_3dB)**2/log2
+            alpha = (np.pi*tmpControl.bandwidth)**2/np.log(2)
+            #Then in the impulse response in the time domain is exp(-t^2*alpha) and we want to go out to 2.5sigma to ensure we start small
+            tmax = 2.5/np.sqrt(alpha)
+            #Number of points we need (assuming equal spacing)
+            numPts = np.ceil(tmax/timeStep)
+            #Make sure we have enough points in the pulse (this could be handled more gracefully)
+            assert optimParams.numTimeSteps > 2*numPts, 'Error: unable to handle such a short pulse with the channel bandwidth.  Need at least {0} points for filtering.'.format(2*numPts+1)
+            #Define the Gaussian impulse response and normalize
+            impulseResponse = np.exp(-alpha*(timeStep*np.linspace(-numPts, numPts, 2*numPts+1))**2)
+            impulseResponse /= np.sum(impulseResponse)
+        else:
+            numPts = 0
+            impulseResponse = np.ones(1, dtype=np.float64)
+
+        tmpBounds[controlct] = tmpControl.maxAmp*np.convolve(impulseResponse, np.ones(optimParams.numTimeSteps-2*numPts))
+
+    bounds = [(-x, x) for x in tmpBounds.flatten()]
         
     #Call the scipy minimizer
     #Look at fmin_tnc.func_globals to see how some variables are defined, they are also stored in scipy.optimize.tnc
-    
-    optimResults = fmin_tnc(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, messages=tnc.MSG_NONE)
+    optimResults = fmin_tnc(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, messages=tnc.MSG_ITER, bounds=bounds, fmin=-1)
     
     #Print out the search result
     print(tnc.RCSTRINGS[optimResults[2]])
    
     optimParams.startControlAmps = curPulse
-    optimParams.controlAmps = optimResults[0].reshape((optimParams.numControls, optimParams.numTimeSteps))
+    optimParams.controlAmps = optimResults[0].reshape((optimParams.numControlLines, optimParams.numTimeSteps))
         
     
     

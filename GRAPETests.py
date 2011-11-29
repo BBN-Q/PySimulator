@@ -11,6 +11,7 @@ from QuantumSystems import SCQubit, Hamiltonian, Dissipator
 import OptimalControl
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Test(unittest.TestCase):
 
@@ -47,11 +48,9 @@ class Test(unittest.TestCase):
         pulseParams.type = 'state2state'
         
         #Call the optimization    
-        optimizationResults = OptimalControl.optimize_pulse(pulseParams, systemParams)
-        
+        OptimalControl.optimize_pulse(pulseParams, systemParams)
+
         #Now test the optimized pulse and make sure it puts all the population in the excited state
-        pulseParams.controlAmps = np.array([optimizationResults[0]])
-        
         result = simulate_sequence(pulseParams, systemParams, pulseParams.rhoStart, simType='unitary')
         assert result > 0.99
         
