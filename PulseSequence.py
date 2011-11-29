@@ -6,6 +6,9 @@ Created on Nov 6, 2011
 import numpy as np
 
 class ControlLine(object):
+    '''
+    A class for control line: basically a modulated microwave carrier. 
+    '''
     def __init__(self, freq = 0, initialPhase = 0, controlType = None, bandwidth=np.inf, maxAmp=np.inf):
         self.freq = freq
         self.initialPhase = initialPhase
@@ -15,7 +18,7 @@ class ControlLine(object):
         
 class PulseSequence(object):
     '''
-    classdocs
+    A class for describing pulse sequences in terms of control lines, amplitudes of those control lines and the timesteps. 
     '''
 
     def __init__(self):

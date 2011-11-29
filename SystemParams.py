@@ -10,7 +10,9 @@ from QuantumSystems import Interaction, Hamiltonian, expand_hilbert_space
 
 class SystemParams(object):
     '''
-    A class containing all the system parameters - mainly Hamiltonians.
+    A class containing all the system parameters: subsystems, the interactions between the subsystems and the control Hamiltonians.
+    These have to correspond in order to the control lines.  Also, helper function for creating the full Hamiltonian 
+    over all the sub-systems. 
     '''
 
     def __init__(self):
