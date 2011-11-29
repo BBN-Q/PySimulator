@@ -184,7 +184,7 @@ class Dissipator(object):
     
 class Interaction(object):
     '''
-    A class for interactions between quantum system
+    A class for interactions between quantum systems
     '''
     def __init__(self, system1 = None, system2 = None, interactionType = None, interactionStrength = None, interactionMat = None):
         self.system1 = system1
@@ -262,7 +262,7 @@ def expand_hilbert_space(operator, operatorSubSystems, eyeSubSystems, dimensions
             #Recorder the indices to reflect the swap
             curIndices[[curInd-1,curInd]] = curIndices[[curInd, curInd-1]]
             
-    #Apply the permutation matrix and return it
+    #Apply the permutation matrix and return the re-ordered operator
     return np.dot(np.dot(totP, tmpMat), totP.transpose())
     
     

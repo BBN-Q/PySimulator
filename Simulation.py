@@ -16,6 +16,10 @@ from progressbar import Percentage, Bar, ProgressBar, ETA
 from Evolution import evolution_unitary, evolution_lindblad
 
 def simulate_sequence(pulseSeq=None, systemParams=None, rhoIn=None, simType='unitary'):
+    '''
+    Simulate a single pulse sequence and return the expectation value of the measurement.
+    '''
+    
     
     if simType == 'unitary':
         tmpU = evolution_unitary(pulseSeq, systemParams)
@@ -29,6 +33,9 @@ def simulate_sequence(pulseSeq=None, systemParams=None, rhoIn=None, simType='uni
     return np.real(np.trace(np.dot(systemParams.measurement, rhoOut)))
     
 def simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary'):
+    '''
+    Helper function to simulate a series of pusle sequences with parallelization over multiple cores and progress bar output.
+    '''
     
     #Setup a partial function that only takes the sequence
     partial_simulate_sequence = partial(simulate_sequence, systemParams=systemParams, rhoIn=rhoIn, simType=simType)
