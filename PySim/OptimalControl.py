@@ -22,12 +22,12 @@ import scipy.signal
 from PulseSequence import PulseSequence
 from QuantumSystems import Hamiltonian
 
-class PulseOptimParams(PulseSequence):
+class PulseParams(PulseSequence):
     '''
-    For now just a container for pulse optimization parameters.  Subclasses a optimParamsuence as it has to define similar things.
+    For now just a container for pulse optimization parameters.  Subclasses a PulseSequence as it has to define similar things.
     '''
     def __init__(self):
-        super(PulseOptimParams, self).__init__()
+        super(PulseParams, self).__init__()
         self.numChannels = 0
         self.numPoints = 0
         self.startPulse = None

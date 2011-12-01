@@ -5,13 +5,12 @@ Created on Nov 27, 2011
 '''
 import unittest
 
-from SystemParams import SystemParams
-from Simulation import simulate_sequence
-from QuantumSystems import SCQubit, Hamiltonian, Dissipator
-import OptimalControl
+from PySim.SystemParams import SystemParams
+from PySim.Simulation import simulate_sequence
+from PySim.QuantumSystems import SCQubit, Hamiltonian
+from PySim.OptimalControl import optimize_pulse, PulseParams
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 class Test(unittest.TestCase):
 
@@ -39,7 +38,7 @@ class Test(unittest.TestCase):
         
         
         #Setup the pulse parameters for the optimization
-        pulseParams = OptimalControl.PulseOptimParams()
+        pulseParams = PulseParams()
         pulseParams.timeSteps = 1e-9*np.ones(30)
         pulseParams.rhoStart = Q1.levelProjector(0)
         pulseParams.rhoGoal = Q1.levelProjector(1)
@@ -48,7 +47,7 @@ class Test(unittest.TestCase):
         pulseParams.type = 'state2state'
         
         #Call the optimization    
-        OptimalControl.optimize_pulse(pulseParams, systemParams)
+        optimize_pulse(pulseParams, systemParams)
 
         #Now test the optimized pulse and make sure it puts all the population in the excited state
         result = simulate_sequence(pulseParams, systemParams, pulseParams.rhoStart, simType='unitary')

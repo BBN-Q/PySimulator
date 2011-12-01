@@ -10,11 +10,11 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-from SystemParams import SystemParams
-from QuantumSystems import Hamiltonian, Dissipator
-from PulseSequence import PulseSequence
-from Simulation import simulate_sequence_stack, simulate_sequence
-from QuantumSystems import SCQubit
+from PySim.SystemParams import SystemParams
+from PySim.QuantumSystems import Hamiltonian, Dissipator
+from PySim.PulseSequence import PulseSequence
+from PySim.Simulation import simulate_sequence_stack
+from PySim.QuantumSystems import SCQubit
 
 if __name__ == '__main__':
     

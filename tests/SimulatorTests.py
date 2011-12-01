@@ -11,10 +11,10 @@ from scipy.constants import pi
 
 import matplotlib.pyplot as plt
 
-from SystemParams import SystemParams
-from PulseSequence import PulseSequence
-from Simulation import simulate_sequence_stack, simulate_sequence
-from QuantumSystems import SCQubit, Hamiltonian, Dissipator
+from PySim.SystemParams import SystemParams
+from PySim.PulseSequence import PulseSequence
+from PySim.Simulation import simulate_sequence_stack
+from PySim.QuantumSystems import SCQubit, Hamiltonian, Dissipator
 
 
 class SingleQubit(unittest.TestCase):
