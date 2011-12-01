@@ -65,13 +65,13 @@ if __name__ == '__main__':
     systemParams = SystemParams()
     
     #First the two qubits
-    Q1 = SCQubit(numLevels=3, omega=4.86034e9-1e6, delta=-300, name='Q1', T1=5.2e-6)
+    Q1 = SCQubit(numLevels=3, omega=4.86359e9-1e6, delta=-300, name='Q1', T1=5.2e-6)
     systemParams.add_sub_system(Q1)
-    Q2 = SCQubit(numLevels=3, omega=5.19033e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
+    Q2 = SCQubit(numLevels=3, omega=5.19344e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
     systemParams.add_sub_system(Q2)
  
     #Add a 2MHz ZZ interaction 
-    systemParams.add_interaction('Q1', 'Q2', 'ZZ', 0e6)
+    systemParams.add_interaction('Q1', 'Q2', 'ZZ', 2e6)
    
     #Create the full Hamiltonian   
     systemParams.create_full_Ham()
@@ -99,14 +99,14 @@ if __name__ == '__main__':
     rhoIn[0,0] = 1
 
     #First run 1D spectroscopy around the Bell-Rabi drive frequency
-    freqSweep = 1e9*np.linspace(5.00, 5.030, 30)
+    freqSweep = 1e9*np.linspace(5.02, 5.040, 20)
 #    freqSweep = [5.023e9]
     ampSweep = np.linspace(-1,1,80)
     x = np.linspace(-2,2,120)
     pulseAmps = (np.exp(-x**2)).reshape((1,x.size))
 #    ampSweep = [1]
     
-    rabiFreq = 150e6
+    rabiFreq = 320e6
     
     #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
     pulseSeqs = []
