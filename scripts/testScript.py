@@ -34,13 +34,13 @@ if __name__ == '__main__':
     systemParams = SystemParams()
     
     #First the two qubits
-    Q1 = SCQubit(numLevels=3, omega=4.86359e9-1e6, delta=-300, name='Q1', T1=5.2e-6)
+    Q1 = SCQubit(numLevels=3, omega=4.86359e9-1e6, delta=-300e6, name='Q1', T1=5.2e-6)
     systemParams.add_sub_system(Q1)
     Q2 = SCQubit(numLevels=3, omega=5.19344e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
     systemParams.add_sub_system(Q2)
  
     #Add a 2MHz ZZ interaction 
-    systemParams.add_interaction('Q1', 'Q2', 'ZZ', 2e6)
+    systemParams.add_interaction('Q1', 'Q2', 'ZZ', -2e6)
    
     #Create the full Hamiltonian   
     systemParams.create_full_Ham()
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     pulseAmps = (np.exp(-x**2)).reshape((1,x.size))
 #    ampSweep = [1]
     
-    rabiFreq = 320e6
+    rabiFreq = 200e6
     
     #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
     pulseSeqs = []
