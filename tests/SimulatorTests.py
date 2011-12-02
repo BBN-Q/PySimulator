@@ -186,10 +186,10 @@ class SingleQubit(unittest.TestCase):
             plt.figure()
             plt.plot(1e6*delays,results)
             plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
-            plt.title('Ramsey Fringes %.2f MHz Off-Resonance' % (offRes/1e6))
+            plt.title('Ramsey Fringes {0:.2f} MHz Off-Resonance'.format(offRes/1e6))
             plt.xlabel('Pulse Spacing (us)')
             plt.ylabel(r'$\sigma_z$')
-            plt.legend(('Simulated Results', '%.2f MHz Cosine with T1 limited decay.' % (offRes/1e6) ))
+            plt.legend(('Simulated Results', ' {0:.2f} MHz -Sin.'.format(offRes/1e6) ))
             plt.show()
         
 
