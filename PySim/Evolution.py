@@ -20,6 +20,9 @@ def evolution_unitary(pulseSequence, systemParams):
     Main function for evolving a state under unitary conditions
     '''
     
+    #Some error checking
+    assert pulseSequence.numControlLines==systemParams.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
+    
     totU = np.eye(systemParams.dim)
     
     #Loop over each timestep in the sequence
@@ -69,12 +72,10 @@ def evolution_lindblad(pulseSequence, systemParams, rhoIn):
     Currently does not currently properly handle transformation of dissipators into interaction frame. 
     '''
     
-    '''
-    Main function for evolving a state under unitary conditions
-    '''
+    #Some error checking
+    assert pulseSequence.numControlLines==systemParams.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
     
     #Setup the super operators for the dissipators
-    
     supDis = np.zeros((systemParams.dim**2, systemParams.dim**2), dtype=np.complex128)
     for tmpDis in systemParams.dissipators:
         supDis += tmpDis.superOpColStack()
@@ -115,7 +116,7 @@ def evolution_lindblad(pulseSequence, systemParams, rhoIn):
             
             
             #Propagate the unitary
-            totF = np.dot(expm(subTimeStep*(-1j*2*pi*supHtot + supDis)),totF)
+            totF = np.dot(expm(subTimeStep*(1j*2*pi*supHtot + supDis)),totF)
             
             tmpTime += subTimeStep
             curTime += subTimeStep

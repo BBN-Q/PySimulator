@@ -3,6 +3,7 @@ Created on Nov 7, 2011
 
 @author: cryan
 '''
+
 import unittest
 
 import numpy as np
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 
 from PySim.SystemParams import SystemParams
 from PySim.PulseSequence import PulseSequence
-from PySim.Simulation import simulate_sequence_stack
+from PySim.Simulation import simulate_sequence_stack, simulate_sequence
 from PySim.QuantumSystems import SCQubit, Hamiltonian, Dissipator
 
 
@@ -105,7 +106,93 @@ class SingleQubit(unittest.TestCase):
             plt.show()
 
         np.testing.assert_allclose(results, expectedResults , atol = 1e-4)
-  
+        
+    def testRamsey(self):
+        '''
+        Just look at Ramsey decay to make sure we get the off-resonance right.
+        '''
+        
+        #Setup the system
+        self.systemParams.subSystems[0] = SCQubit(2,5e9, 'Q1')
+        self.systemParams.create_full_Ham()
+        self.systemParams.dissipators = [Dissipator(self.qubit.T1Dissipator)]
+        
+        #Setup the pulseSequences
+        delays = np.linspace(0,8e-6,200)
+        t90 = 0.25*(1/self.rabiFreq)
+        offRes = 0.56789e6
+        pulseSeqs = []
+        for delay in delays:
+        
+            tmpPulseSeq = PulseSequence()
+            #Shift the pulsing frequency down by offRes
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), initialPhase=0)
+            #Pulse sequence is X90, delay, X90
+            tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0, 1]], dtype=np.float64)
+            tmpPulseSeq.timeSteps = np.array([t90, delay, t90])
+            #Interaction frame with some odd frequency
+            tmpPulseSeq.H_int = Hamiltonian(np.array([[0,0], [0, 5.00e9]], dtype = np.complex128))
+            
+            pulseSeqs.append(tmpPulseSeq)
+            
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')
+        expectedResults = -np.cos(2*pi*offRes*(delays+t90))*np.exp(-delays/(2*self.qubit.T1))
+        if plotResults:
+            plt.figure()
+            plt.plot(1e6*delays,results)
+            plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
+            plt.title('Ramsey Fringes 0.56789MHz Off-Resonance')
+            plt.xlabel('Pulse Spacing (us)')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', '0.57MHz Cosine with T1 limited decay.'))
+            plt.show()
+
+    def testYPhase(self):
+        
+        '''
+        Make sure the frame-handedness matches what we expect: i.e. if the qubit frequency is 
+        greater than the driver frequency this corresponds to a positive rotation.
+        '''        
+        #Setup the system
+        self.systemParams.subSystems[0] = SCQubit(2,5e9, 'Q1')
+        self.systemParams.create_full_Ham()
+        
+        #Add a Y control Hamiltonian 
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
+        
+        #Setup the pulseSequences
+        delays = np.linspace(0,8e-6,200)
+        t90 = 0.25*(1/self.rabiFreq)
+        offRes = 1.23456e6
+        pulseSeqs = []
+        for delay in delays:
+        
+            tmpPulseSeq = PulseSequence()
+            #Shift the pulsing frequency down by offRes
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), initialPhase=-pi/2)
+            #Pulse sequence is X90, delay, Y90
+            tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0, 0],[0,0,1]], dtype=np.float64)
+            tmpPulseSeq.timeSteps = np.array([t90, delay, t90])
+            #Interaction frame with some odd frequency
+            tmpPulseSeq.H_int = Hamiltonian(np.array([[0,0], [0, 5.00e9]], dtype = np.complex128))
+            
+            pulseSeqs.append(tmpPulseSeq)
+            
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')
+        expectedResults = -np.sin(2*pi*offRes*(delays+t90))
+        if plotResults:
+            plt.figure()
+            plt.plot(1e6*delays,results)
+            plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
+            plt.title('Ramsey Fringes 0.56789MHz Off-Resonance')
+            plt.xlabel('Pulse Spacing (us)')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', '0.57MHz Cosine with T1 limited decay.'))
+            plt.show()
+        
+
+        
     def testT1Recovery(self):
         '''
         Test a simple T1 recovery without any pulses.  Start in the first excited state and watch recovery down to ground state.
@@ -259,4 +346,7 @@ if __name__ == "__main__":
     
     plotResults = True
     
-    unittest.main()
+#    unittest.main()
+    singleTest = unittest.TestSuite()
+    singleTest.addTest(SingleQubit("testYPhase"))
+    unittest.TextTestRunner(verbosity=2).run(singleTest)
