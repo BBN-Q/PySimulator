@@ -25,7 +25,8 @@ class SingleQubit(unittest.TestCase):
         self.systemParams = SystemParams()
         self.qubit = SCQubit(2,0e9, name='Q1', T1=1e-6)
         self.systemParams.add_sub_system(self.qubit)
-        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
+        #self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*self.qubit.pauliX), quadrature = Hamiltonian(0.5*self.qubit.pauliY))
         self.systemParams.measurement = self.qubit.pauliZ
         self.systemParams.create_full_Ham()
         
@@ -158,12 +159,12 @@ class SingleQubit(unittest.TestCase):
         self.systemParams.create_full_Ham()
         
         #Add a Y control Hamiltonian 
-        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*self.qubit.pauliX), quadrature = Hamiltonian(0.5*self.qubit.pauliY))
         
         #Setup the pulseSequences
         delays = np.linspace(0,8e-6,200)
         t90 = 0.25*(1/self.rabiFreq)
-        offRes = 1.23456e6
+        offRes = 1.2345e6
         pulseSeqs = []
         for delay in delays:
         
@@ -185,10 +186,10 @@ class SingleQubit(unittest.TestCase):
             plt.figure()
             plt.plot(1e6*delays,results)
             plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
-            plt.title('Ramsey Fringes From X90 - Y90 SequenceOff-Resonance')
+            plt.title('Ramsey Fringes %.2f MHz Off-Resonance' % (offRes/1e6))
             plt.xlabel('Pulse Spacing (us)')
             plt.ylabel(r'$\sigma_z$')
-            plt.legend(('Simulated Results', '-Sin'))
+            plt.legend(('Simulated Results', '%.2f MHz Cosine with T1 limited decay.' % (offRes/1e6) ))
             plt.show()
         
 
