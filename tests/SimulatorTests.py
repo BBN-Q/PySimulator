@@ -19,7 +19,6 @@ from PySim.QuantumSystems import SCQubit, Hamiltonian, Dissipator
 
 class SingleQubit(unittest.TestCase):
 
-
     def setUp(self):
         #Setup the system
         self.systemParams = SystemParams()
@@ -58,14 +57,18 @@ class SingleQubit(unittest.TestCase):
             pulseSeqs.append(tmpPulseSeq)
         
         results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
-    
+        expectedResults = np.cos(2*pi*self.rabiFreq*self.pulseLengths)
         if plotResults:
             plt.figure()
             plt.plot(self.pulseLengths,results)
+            plt.plot(self.pulseLengths, expectedResults, color='r', linestyle='--', linewidth=2)
             plt.title('10MHz Rabi Oscillations in Rotating Frame')
+            plt.xlabel('Pulse Length')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', '10MHz Cosine'))
             plt.show()
 
-        np.testing.assert_allclose(results, np.cos(2*pi*self.rabiFreq*self.pulseLengths), atol = 1e-4)
+        np.testing.assert_allclose(results, expectedResults , atol = 1e-4)
 
     def testRabiInteractionFrame(self):
         '''
@@ -90,15 +93,19 @@ class SingleQubit(unittest.TestCase):
             pulseSeqs.append(tmpPulseSeq)
             
         results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
-    
+        expectedResults = np.cos(2*pi*self.rabiFreq*self.pulseLengths)
         if plotResults:
             plt.figure()
             plt.plot(self.pulseLengths,results)
-            plt.title('10MHz Rabi Oscillations using Interaction Frame')
+            plt.plot(self.pulseLengths, expectedResults, color='r', linestyle='--', linewidth=2)
+            plt.title('10MHz Rabi Oscillations in Rotating Frame')
+            plt.xlabel('Pulse Length')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', '10MHz Cosine'))
             plt.show()
 
-        np.testing.assert_allclose(results, np.cos(2*pi*self.rabiFreq*self.pulseLengths), atol = 1e-4)
-
+        np.testing.assert_allclose(results, expectedResults , atol = 1e-4)
+  
     def testT1Recovery(self):
         '''
         Test a simple T1 recovery without any pulses.  Start in the first excited state and watch recovery down to ground state.
@@ -117,16 +124,18 @@ class SingleQubit(unittest.TestCase):
             pulseSeqs.append(tmpPulseSeq)
         
         results = simulate_sequence_stack(pulseSeqs, self.systemParams, np.array([[0,0],[0,1]], dtype=np.complex128), simType='lindblad')
-    
+        expectedResults = 1-2*np.exp(-delays/self.qubit.T1)
         if plotResults:
             plt.figure()
             plt.plot(1e6*delays,results)
+            plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
             plt.xlabel(r'Recovery Time ($\mu$s)')
             plt.ylabel(r'Expectation Value of $\sigma_z$')
             plt.title(r'$T_1$ Recovery to the Ground State')
+            plt.legend(('Simulated Results', 'Exponential T1 Recovery'))
             plt.show()
         
-        np.testing.assert_allclose(results, 1-2*np.exp(-delays/1e-6), atol=1e-4)
+        np.testing.assert_allclose(results, expectedResults, atol=1e-4)
         
 class SingleQutrit(unittest.TestCase):
 
