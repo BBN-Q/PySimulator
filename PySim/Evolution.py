@@ -8,12 +8,10 @@ Functions for evolving the pulse sequence
 '''
 
 import numpy as np
-from numpy import sin, cos,pi
+from numpy import sin, cos
 
 from scipy.constants import pi
 from scipy.linalg import expm
-
-from QuantumSystems import Hamiltonian
 
 from copy import deepcopy
 

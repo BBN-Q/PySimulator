@@ -24,8 +24,8 @@ class SingleQubit(unittest.TestCase):
         self.systemParams = SystemParams()
         self.qubit = SCQubit(2,0e9, name='Q1', T1=1e-6)
         self.systemParams.add_sub_system(self.qubit)
-        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
-        self.systemParams.measurement = -self.qubit.pauliZ
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
+        self.systemParams.measurement = self.qubit.pauliZ
         self.systemParams.create_full_Ham()
         
         #Define Rabi frequency and pulse lengths
@@ -84,7 +84,7 @@ class SingleQubit(unittest.TestCase):
         for pulseLength in self.pulseLengths:
         
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=5.0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-5.0e9, initialPhase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([pulseLength])
             tmpPulseSeq.maxTimeStep = pi/2*1e-10
@@ -145,7 +145,7 @@ class SingleQutrit(unittest.TestCase):
         self.qubit = SCQubit(3, 5e9, -100e6, name='Q1', T1=2e-6)
         self.systemParams.add_sub_system(self.qubit)
         self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
-        self.systemParams.measurement = -self.qubit.pauliZ
+        self.systemParams.measurement = self.qubit.pauliZ
         self.systemParams.create_full_Ham()
         
         #Add the 2us T1 dissipator
@@ -201,10 +201,10 @@ class TwoQubit(unittest.TestCase):
         self.Q2 = SCQubit(2, 6e9, name='Q2')
         self.systemParams.add_sub_system(self.Q2)
         X = 0.5*(self.Q1.loweringOp + self.Q1.raisingOp)
-        Y = -0.5*(-1j*self.Q1.loweringOp + 1j*self.Q2.raisingOp)
+        Y = 0.5*(-1j*self.Q1.loweringOp + 1j*self.Q2.raisingOp)
         self.systemParams.add_control_ham(inphase = Hamiltonian(self.systemParams.expand_operator('Q1', X)), quadrature = Hamiltonian(self.systemParams.expand_operator('Q1', Y)))
         self.systemParams.add_control_ham(inphase = Hamiltonian(self.systemParams.expand_operator('Q2', X)), quadrature = Hamiltonian(self.systemParams.expand_operator('Q2', Y)))
-        self.systemParams.measurement = -self.systemParams.expand_operator('Q1', self.Q1.pauliZ) - self.systemParams.expand_operator('Q2', self.Q2.pauliZ)
+        self.systemParams.measurement = self.systemParams.expand_operator('Q1', self.Q1.pauliZ) + self.systemParams.expand_operator('Q2', self.Q2.pauliZ)
         self.systemParams.create_full_Ham()
         
         #Define Rabi frequency and pulse lengths
@@ -232,7 +232,7 @@ class TwoQubit(unittest.TestCase):
         pulseSeqs = []
         for delay in delays:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=5.0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-5.0e9, initialPhase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0], [0,0]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([25e-9, delay])
             tmpPulseSeq.maxTimeStep = np.Inf

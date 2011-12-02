@@ -91,8 +91,8 @@ class SCQubit(SNO):
     def pauliZ(self):
         assert self.dim > 1, 'Oops! Defining a Z operator requires two more more dimensions.'
         tmpMat = self.zeros()
-        tmpMat[0,0] = -1
-        tmpMat[1,1] = 1
+        tmpMat[0,0] = 1
+        tmpMat[1,1] = -1
         return tmpMat
         
     @property
