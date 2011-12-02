@@ -57,7 +57,7 @@ class SingleQubit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
         
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
         expectedResults = np.cos(2*pi*self.rabiFreq*self.pulseLengths)
         if plotResults:
             plt.figure()
@@ -93,7 +93,7 @@ class SingleQubit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
             
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
         expectedResults = np.cos(2*pi*self.rabiFreq*self.pulseLengths)
         if plotResults:
             plt.figure()
@@ -135,7 +135,7 @@ class SingleQubit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
             
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')[0]
         expectedResults = -np.cos(2*pi*offRes*(delays+t90))*np.exp(-delays/(2*self.qubit.T1))
         if plotResults:
             plt.figure()
@@ -179,16 +179,16 @@ class SingleQubit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
             
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')[0]
         expectedResults = -np.sin(2*pi*offRes*(delays+t90))
         if plotResults:
             plt.figure()
             plt.plot(1e6*delays,results)
             plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
-            plt.title('Ramsey Fringes 0.56789MHz Off-Resonance')
+            plt.title('Ramsey Fringes From X90 - Y90 SequenceOff-Resonance')
             plt.xlabel('Pulse Spacing (us)')
             plt.ylabel(r'$\sigma_z$')
-            plt.legend(('Simulated Results', '0.57MHz Cosine with T1 limited decay.'))
+            plt.legend(('Simulated Results', '-Sin'))
             plt.show()
         
 
@@ -204,13 +204,15 @@ class SingleQubit(unittest.TestCase):
         pulseSeqs = []
         for tmpDelay in delays:
             tmpPulseSeq = PulseSequence()
+            tmpPulseSeq.add_control_line()
+            tmpPulseSeq.controlAmps = np.array([[0]])
             tmpPulseSeq.timeSteps = np.array([tmpDelay])
             tmpPulseSeq.maxTimeStep = tmpDelay
             tmpPulseSeq.H_int = None
             
             pulseSeqs.append(tmpPulseSeq)
         
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, np.array([[0,0],[0,1]], dtype=np.complex128), simType='lindblad')
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, np.array([[0,0],[0,1]], dtype=np.complex128), simType='lindblad')[0]
         expectedResults = 1-2*np.exp(-delays/self.qubit.T1)
         if plotResults:
             plt.figure()
@@ -266,7 +268,7 @@ class SingleQutrit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
         
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')[0]
 
         if plotResults:        
             plt.figure()
@@ -320,6 +322,7 @@ class TwoQubit(unittest.TestCase):
         for delay in delays:
             tmpPulseSeq = PulseSequence()
             tmpPulseSeq.add_control_line(freq=-5.0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-6.0e9, initialPhase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0], [0,0]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([25e-9, delay])
             tmpPulseSeq.maxTimeStep = np.Inf
@@ -328,9 +331,9 @@ class TwoQubit(unittest.TestCase):
             pulseSeqs.append(tmpPulseSeq)
         
         self.systemParams.measurement = np.kron(self.Q1.pauliX, self.Q2.pauliZ)
-        resultsXZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+        resultsXZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
         self.systemParams.measurement = np.kron(self.Q1.pauliY, self.Q2.pauliZ)
-        resultsYZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+        resultsYZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
 
         if plotResults:
             plt.figure()
@@ -346,7 +349,7 @@ if __name__ == "__main__":
     
     plotResults = True
     
-#    unittest.main()
-    singleTest = unittest.TestSuite()
-    singleTest.addTest(SingleQubit("testYPhase"))
-    unittest.TextTestRunner(verbosity=2).run(singleTest)
+    unittest.main()
+#    singleTest = unittest.TestSuite()
+#    singleTest.addTest(SingleQubit("testYPhase"))
+#    unittest.TextTestRunner(verbosity=2).run(singleTest)

@@ -49,6 +49,8 @@ def evolution_unitary(pulseSequence, systemParams):
                 tmpMat *= pulseSequence.controlAmps[controlct,timect]
                 Htot += tmpMat
 
+            
+
             if pulseSequence.H_int is not None:
                 #Move the total Hamiltonian into the interaction frame
                 Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
@@ -121,11 +123,7 @@ def evolution_lindblad(pulseSequence, systemParams, rhoIn):
             tmpTime += subTimeStep
             curTime += subTimeStep
             
-    #Reshape, propagate and reshape again the density matrix
-    rhoOut = (np.dot(totF, rhoIn.reshape((systemParams.dim**2,1), order='F'))).reshape((systemParams.dim,systemParams.dim), order='F')
-    
-            
-    return rhoOut
+    return totF
 
     
     

@@ -50,7 +50,7 @@ class Test(unittest.TestCase):
         optimize_pulse(pulseParams, systemParams)
 
         #Now test the optimized pulse and make sure it puts all the population in the excited state
-        result = simulate_sequence(pulseParams, systemParams, pulseParams.rhoStart, simType='unitary')
+        result = simulate_sequence(pulseParams, systemParams, pulseParams.rhoStart, simType='unitary')[0]
         assert result > 0.99
         
 if __name__ == "__main__":

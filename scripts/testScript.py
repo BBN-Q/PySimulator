@@ -75,7 +75,7 @@ if __name__ == '__main__':
     pulseAmps = (np.exp(-x**2)).reshape((1,x.size))
 #    ampSweep = [1]
     
-    rabiFreq = 200e6
+    rabiFreq = 175e6
     
     #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
     pulseSeqs = []
@@ -91,7 +91,7 @@ if __name__ == '__main__':
         
             pulseSeqs.append(tmpPulseSeq)
     
-    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')
+    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
     results.resize((freqSweep.size, ampSweep.size))
     
     plt.figure()
