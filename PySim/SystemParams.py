@@ -24,6 +24,7 @@ class SystemParams(object):
         self.subSystems = []
         self.interactions = []
         self.Hnat = None
+        self.measurement = None
         
     def add_control_ham(self, inphase = None, quadrature = None):
         ''' Add a control Hamiltonian.  Should  be added in the same order that they are listed as control amplitdues.'''

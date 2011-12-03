@@ -17,8 +17,6 @@ from scipy.linalg import expm
 
 from scipy.optimize import fmin_tnc, tnc
 
-import scipy.signal
-
 from PulseSequence import PulseSequence
 from QuantumSystems import Hamiltonian
 
@@ -30,9 +28,8 @@ class PulseParams(PulseSequence):
         super(PulseParams, self).__init__()
         self.numChannels = 0
         self.numPoints = 0
-        self.startPulse = None
-        self.ramps = None
-        self.maxControlAmps = None
+        self.startControlAmps = None  #Initial guess for the pulse
+        self.fTol = 1e-4    #optimization paramter: will exit when difference in fidelity is less than this. 
 
 def create_random_pulse(numChannels, numPoints):
     '''
@@ -42,19 +39,19 @@ def create_random_pulse(numChannels, numPoints):
     return 5e6*np.ones((numChannels, numPoints))
 
 
-def calc_control_Hams(optimParamsuence, systemParams):
+def calc_control_Hams(optimParams, systemParams):
     '''
     A helper function to calculate the control Hamiltonians in the interaction frame.  This only needs to be done once per opimization. 
     '''
     #We'll store them in a numControlHamsxnumTimeSteps array
-    controlHams = np.zeros((systemParams.numControlHams, optimParamsuence.numTimeSteps, systemParams.dim, systemParams.dim), dtype = np.complex128)
+    controlHams = np.zeros((systemParams.numControlHams, optimParams.numTimeSteps, systemParams.dim, systemParams.dim), dtype = np.complex128)
     
     #Now loop over each timestep
     curTime = 0.0
-    for timect, timeStep in enumerate(optimParamsuence.timeSteps):
+    for timect, timeStep in enumerate(optimParams.timeSteps):
         
         #Loop over each of the control Hamiltonians
-        for controlct, tmpControl in enumerate(optimParamsuence.controlLines):
+        for controlct, tmpControl in enumerate(optimParams.controlLines):
             tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.initialPhase
             if tmpControl.controlType == 'rotating':
                 tmpHam = Hamiltonian(cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix)
@@ -63,21 +60,18 @@ def calc_control_Hams(optimParamsuence, systemParams):
             else:
                 raise KeyError('Unknown control type.')
 
-        if optimParamsuence.H_int is not None:
-            #Move the total Hamiltonian into the interaction frame
-            tmpHam.calc_interaction_frame(optimParamsuence.H_int, curTime)
-            controlHams[controlct, timect] = tmpHam.interaction_matrix
-        else:
-            #Propagate the unitary
-            controlHams[controlct, timect] = tmpHam.matrix
+            if optimParams.H_int is not None:
+                #Move the total Hamiltonian into the interaction frame
+                tmpHam.calc_interaction_frame(optimParams.H_int, curTime)
+                controlHams[controlct, timect] = tmpHam.interactionMatrix + optimParams.H_int.matrix
+            else:
+                #Just store the matrix
+                controlHams[controlct, timect] = tmpHam.matrix
 
         #Update the times
         curTime += timeStep
             
     return controlHams
-
-    
-
 
 def evolution_unitary(optimParams, systemParams, controlHams):
     '''
@@ -92,19 +86,18 @@ def evolution_unitary(optimParams, systemParams, controlHams):
     for timect, timeStep in enumerate(optimParams.timeSteps):
         #Initialize the Hamiltonian to the drift Hamiltonian
         Htot = deepcopy(systemParams.Hnat)
+
+        if optimParams.H_int is not None:
+            #Move the total Hamiltonian into the interaction frame
+            Htot.calc_interaction_frame(optimParams.H_int, curTime)
+            Htot.matrix = np.copy(Htot.interactionMatrix)
         
         #Add each of the control Hamiltonians
         for controlct in range(optimParams.numControlLines):
             Htot += optimParams.controlAmps[controlct, timect]*controlHams[controlct, timect]
 
-        if optimParams.H_int is not None:
-            #Move the total Hamiltonian into the interaction frame
-            Htot.calc_interaction_frame(optimParams.H_int, curTime)
-            #Propagate the unitary
-            timeStepUs[timect] = expm(-1j*2*pi*timeStep*Htot.interactionMatrix) 
-        else:
-            #Propagate the unitary
-            timeStepUs[timect] = expm(-1j*2*pi*timeStep*Htot.matrix)
+        #Propagate the unitary
+        timeStepUs[timect] = expm(-1j*2*pi*timeStep*Htot.matrix)
 
         totU = np.dot(timeStepUs[timect],totU)
         
@@ -129,7 +122,7 @@ def eval_pulse(optimParams, systemParams, controlHams):
     
     #Use the trace fidelity to evaluate it
     if optimParams.type == 'unitary':
-        return -(np.abs(np.trace(np.dot(Usim.conj().T, optimParams.Ugoal)))/systemParams.dim)**2
+        return -(np.abs(np.trace(np.dot(Usim.conj().T, optimParams.Ugoal)))**2)/optimParams.dimC2
     elif optimParams.type == 'state2state':
         rhoOut = np.dot(np.dot(Usim, optimParams.rhoStart), Usim.conj().T)
         return -(np.abs(np.trace(np.dot(rhoOut, optimParams.rhoGoal))))**2
@@ -171,7 +164,7 @@ def eval_derivs(optimParams, systemParams, controlHams):
     if optimParams.type == 'unitary':
         for timect in range(numSteps):
             for controlct in range(systemParams.numControlHams):
-                derivs[controlct, timect] = 2*optimParams.timeSteps[timect]*np.imag(np.trace(np.dot(Uback[timect].conj().T, 
+                derivs[controlct, timect] = (2/optimParams.dimC2)*optimParams.timeSteps[timect]*np.imag(np.trace(np.dot(Uback[timect].conj().T, 
                                             np.dot(controlHams[controlct,timect], Uforward[timect]))) *
                                                np.trace(np.dot(Uforward[timect].conj().T, Uback[timect])))
     elif optimParams.type == 'state2state':
@@ -193,10 +186,14 @@ def optimize_pulse(optimParams, systemParams):
     '''
     
     #Create the initial pulse
-    if optimParams.controlAmps is None:
+    if optimParams.startControlAmps is None:
         curPulse = create_random_pulse(optimParams.numControlLines, optimParams.numTimeSteps)
     else:
-        curPulse = optimParams.controlAmps
+        curPulse = np.copy(optimParams.startControlAmps)
+        
+    #Figure out the dimension (squared) of the computational space from the desired unitary
+    #We use this for normalizing the results
+    optimParams.dimC2 = np.abs(np.trace(np.dot(optimParams.Ugoal.conj().T, optimParams.Ugoal)))**2 if optimParams.type == 'unitary' else None
     
     #Calculate the interaction frame Hamiltonians
     controlHams_int = calc_control_Hams(optimParams, systemParams)
@@ -238,7 +235,7 @@ def optimize_pulse(optimParams, systemParams):
         
     #Call the scipy minimizer
     #Look at fmin_tnc.func_globals to see how some variables are defined, they are also stored in scipy.optimize.tnc
-    optimResults = fmin_tnc(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, messages=tnc.MSG_ITER, bounds=bounds, fmin=-1)
+    optimResults = fmin_tnc(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, messages=tnc.MSG_ITER, bounds=bounds, fmin=-1, ftol=optimParams.fTol)
     
     #Print out the search result
     print(tnc.RCSTRINGS[optimResults[2]])

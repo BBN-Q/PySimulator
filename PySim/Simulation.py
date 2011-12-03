@@ -29,8 +29,11 @@ def simulate_sequence(pulseSeq=None, systemParams=None, rhoIn=None, simType='uni
     else:
         raise NameError('Unknown simulation type.')
     
-    #Return the expectation value of the measurement operator the unitary and the rhouut    
-    measOut =  np.real(np.trace(np.dot(systemParams.measurement, rhoOut)))
+    #Return the expectation value of the measurement operator the unitary and the rhouut
+    if systemParams.measurement is not None:    
+        measOut =  np.real(np.trace(np.dot(systemParams.measurement, rhoOut)))
+    else:
+        measOut = None
     
     #Return everything
     return measOut, totProp, rhoOut
