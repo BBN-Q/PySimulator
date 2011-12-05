@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 from scipy.signal import decimate
 from scipy.constants import pi
+from scipy.linalg import expm
 
 from PySim.SystemParams import SystemParams
 from PySim.QuantumSystems import Hamiltonian, Dissipator
@@ -69,14 +70,14 @@ systemParams.add_control_ham(inphase = Hamiltonian(systemParams.expand_operator(
 #rhoIn[0,0] = 1
 
 
-sampRate = 10e9
+sampRate = 2*1.2e9
 timeStep = 1.0/sampRate
 
 drive1Freq = Q1.omega
 drive2Freq = Q2.omega
 
 pulseParams = PulseParams()
-pulseParams.timeSteps = timeStep*np.ones(400)
+pulseParams.timeSteps = timeStep*np.ones(144)
 pulseParams.add_control_line(freq=-drive1Freq, initialPhase=0, bandwidth=300e6, maxAmp=100e6)
 pulseParams.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, bandwidth=300e6, maxAmp=100e6)
 pulseParams.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
@@ -86,16 +87,42 @@ pulseParams.type = 'unitary'
 Q2Goal = np.eye(3, dtype=np.complex128)
 Q2Goal[2,2] = 0
 pulseParams.Ugoal = np.kron(Q1.pauliX, Q2Goal)
+
+#Rotate Q2's desired unitary by the frame rotation
+#UFrameShift = expm(1j*72e-9*systemParams.expand_operator('Q2', np.diag((Q2.omega-Q1.omega)*np.arange(Q2.dim, dtype=np.complex128))))
+#pulseParams.Ugoal = np.dot(UFrameShift, pulseParams.Ugoal)
+
+
+#State to state goals
 pulseParams.rhoStart = np.zeros((9,9), dtype=np.complex128)
 pulseParams.rhoStart[0,0] = 1
 pulseParams.rhoGoal = np.zeros((9,9), dtype=np.complex128)
 pulseParams.rhoGoal[3,3] = 1
 
 #Call the optimization    
-optimize_pulse(pulseParams, systemParams)
+#optimize_pulse(pulseParams, systemParams)
 
 #Decimate the pulse down to the AWG sampling rate
-pulseParams.controlAmps = decimate(pulseParams.controlAmps, 10, axis=1)
-pulseParams.timeSteps = 1e-9*np.ones(60)
+#pulseParams.controlAmps = decimate(pulseParams.controlAmps, 10, n=5, axis=1)
+#pulseParams.timeSteps = 1e-9*np.ones(60)
+
+
+'''
+Look at the fidelity of some more traditional pulses
+'''
+
+#First a simple Gaussian 
+xPts = np.linspace(-2.5,2.5,1000)
+gaussPulse = np.exp(-0.5*(xPts**2)) - np.exp(-0.5*2.5**2)
+pulseInt = np.sum(gaussPulse)
+pulseTimes = 1e-9*np.arange(20,400,10)
+results = np.zeros(pulseTimes.size)
+for ct,pulseTime in enumerate(pulseTimes):
+    #Work out the scaling 
+    pulseScale = (0.5*gaussPulse.size)/(pulseTime*pulseInt)
+    pulseParams.controlAmps = pulseScale*np.vstack((gaussPulse, np.zeros(gaussPulse.size)))
+    pulseParams.timeSteps = (pulseTime/gaussPulse.size)*np.ones(gaussPulse.size)
+    tmpResult = simulate_sequence(pulseParams, systemParams, pulseParams.rhoStart, simType='unitary')
+    results[ct] = np.abs(np.trace(np.dot(pulseParams.Ugoal.conj().T, tmpResult[1])))**2/16
 
 
