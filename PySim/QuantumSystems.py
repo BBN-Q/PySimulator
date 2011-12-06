@@ -67,6 +67,13 @@ class SNO(QuantumSystem):
         Create the lowering operator under the linear harmonic oscillator function. This may not be true with a cavity.
         '''
         return np.diag(np.sqrt(np.arange(1,self.dim, dtype=np.complex128)), 1)
+    
+    @property
+    def numberOp(self):
+        '''
+        Create the number operator
+        '''
+        return np.diag(np.arange(self.dim, dtype=np.complex128))
 
     def levelProjector(self, level):
         '''
