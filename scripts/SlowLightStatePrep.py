@@ -109,7 +109,7 @@ plt.plot(pulseTimes*1e9,DRAGResults)
 
 '''State to State Optimal Control'''
 numSteps = 100
-pulseTimes = 1e-9*np.arange(4,25,3)
+pulseTimes = 1e-9*np.arange(3,25,3)
 results = np.zeros_like(pulseTimes)
 for ct, pulseTime in enumerate(pulseTimes): 
     pulseParams = PulseParams()
@@ -129,7 +129,7 @@ for ct, pulseTime in enumerate(pulseTimes):
 plt.plot(pulseTimes*1e9,results,'*')    
 plt.xlabel('Pulse Time (ns)')
 plt.ylabel('Population in First Excited State')
-plt.title('Excited State Preparation')
+plt.title('Excited State Preparation with T1 = {0:.0f}ns'.format(1e9*qubit.T1))
 plt.legend(('Square','Gaussian','DRAG','Optimal Control'))
 plt.show()
 

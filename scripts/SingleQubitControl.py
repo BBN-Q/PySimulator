@@ -57,8 +57,9 @@ if __name__ == '__main__':
     
     #Setup the measurement operator
 #    systemParams.measurement = -systemParams.expand_operator('Q1', Q1.pauliZ)
-    systemParams.measurement = 0.6*np.eye(9) - 0.07*systemParams.expand_operator('Q1', Q1.pauliZ) - 0.05*systemParams.expand_operator('Q2', Q2.pauliZ) - 0.04*np.kron(Q1.pauliZ, Q2.pauliZ)
-
+    systemParams.measurement = 0.5*np.kron(Q1.levelProjector(0), Q2.levelProjector(0)) + 0.67*np.kron(Q1.levelProjector(1), Q2.levelProjector(0)) + \
+                                0.64*np.kron(Q1.levelProjector(0), Q2.levelProjector(1)) + 0.72*np.kron(Q1.levelProjector(0), Q2.levelProjector(2)) + \
+                                0.75*np.kron(Q1.levelProjector(1), Q2.levelProjector(1))
     #Add the T1 dissipators
     systemParams.dissipators.append(Dissipator(systemParams.expand_operator('Q1', Q1.T1Dissipator)))
     systemParams.dissipators.append(Dissipator(systemParams.expand_operator('Q2', Q2.T1Dissipator)))
@@ -75,42 +76,14 @@ if __name__ == '__main__':
     drive1Freq = Q1.omega
     drive2Freq = Q2.omega
 
-#    #Calibrate the Jay pulse
-    jayPulse = np.loadtxt('jayPulse.dat', dtype=np.float64)
-    
-#    tmpControls = np.zeros((4,jayPulse.shape[0]))
-#    tmpControls[0] = jayPulse[:,0]
-#    tmpControls[1] = jayPulse[:,1]
-#    
-#    
-#    #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
-#    pulseSeqs = []
-#    for nutFreq in nutFreqs:
-#        tmpPulseSeq = PulseSequence()
-#        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0)
-#        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2)
-#        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0)
-#        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2)
-#        tmpPulseSeq.controlAmps = nutFreq*tmpControls
-#        tmpPulseSeq.timeSteps = timeStep*np.ones(tmpControls.shape[1])
-#        tmpPulseSeq.maxTimeStep = 5e-10
-#        tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
-#        pulseSeqs.append(tmpPulseSeq)
-#
-#    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')
-    
-     
-    #Calibrates to 15.48MHz
-    
-    #Calibrate the Q2 pi DRAG pulse
-    numPoints = 40
+
+    #Calibrate a 120ns Gaussian pulse on Q1
+    numPoints = 144
     xPts = np.linspace(-2,2,numPoints)
     gaussPulse = np.exp(-(xPts**2))
-    dragCorrection = -0.5/Q2.delta*xPts*gaussPulse
-#    tmpControls = np.zeros((4,numPoints))
-#    tmpControls[2] = gaussPulse
-#    tmpControls[3] = dragCorrection
-#    
+    tmpControls = np.zeros((4,numPoints))
+    tmpControls[0] = gaussPulse
+#
 #    #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
 #    pulseSeqs = []
 #    for nutFreq in nutFreqs:
@@ -125,40 +98,65 @@ if __name__ == '__main__':
 #        tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
 #        pulseSeqs.append(tmpPulseSeq)
 #
-#    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')
+#    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
+#    
+    #Calibrates to 9.51MHz as expected
+    Q1Cal = 2*0.5/(np.sum(gaussPulse)*timeStep)
+    bufferPts = 2
+    Q1PiPulse = np.zeros((4,numPoints))
+    Q1PiPulse[0] = Q1Cal*gaussPulse
+    Q1PiBlock = np.hstack((np.zeros((4,bufferPts)), Q1PiPulse, np.zeros((4,bufferPts))))
+
+    
+    #Calibrate the Q2 pi DRAG pulse
+    numPoints = 64
+    xPts = np.linspace(-2,2,numPoints)
+    gaussPulse = np.exp(-(xPts**2))
+    dragCorrection = -0.08*(1.0/Q2.delta)*(4.0/(64.0/1.2e9))*(-xPts*np.exp(-0.5*(xPts**2)))
+    tmpControls = np.zeros((4,numPoints))
+    tmpControls[2] = gaussPulse
+    tmpControls[3] = dragCorrection
+    
+    #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
+#    pulseSeqs = []
+#    for nutFreq in nutFreqs:
+#        tmpPulseSeq = PulseSequence()
+#        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0)
+#        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2)
+#        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0)
+#        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2)
+#        tmpPulseSeq.controlAmps = nutFreq*tmpControls
+#        tmpPulseSeq.timeSteps = timeStep*np.ones(tmpControls.shape[1])
+#        tmpPulseSeq.maxTimeStep = 5e-10
+#        tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
+#        pulseSeqs.append(tmpPulseSeq)
+#
+#    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
 #
 #    plt.figure()
 #    plt.plot(nutFreqs/1e6, results)
 #    plt.show()
 #    
-    #Calibrates to 35MHz
+    #Calibrates to 21.58MHz
+    Q2Cal = 2*0.5/(np.sum(gaussPulse)*timeStep)
+    Q2PiBlock = np.zeros((4,numPoints+2*bufferPts))
+    Q2PiBlock[2,2:-2] = gaussPulse
+    Q2PiBlock[3,2:-2] = dragCorrection
+    Q2PiBlock *= Q2Cal
     
     #Run the actual pi-pi-pi-pi experiment
     
     #Setup the pulse sequence blocks
-    bufferPts = 2
-    jayBlock = np.zeros((4,jayPulse.shape[0]))
-    jayBlock[0] = jayPulse[:,0]
-    jayBlock[1] = jayPulse[:,1]
-    jayBlock = 15.48e6*np.hstack((np.zeros((4,bufferPts)), jayBlock, np.zeros((4,bufferPts))))
-    
-    Q2PiBlock = np.zeros((4,numPoints+2*bufferPts))
-    Q2PiBlock[2,2:-2] = gaussPulse
-    Q2PiBlock[3,2:-2] = dragCorrection
-    Q2PiBlock *= 35e6
-    
-#    jayBlock = np.flipud(Q2PiBlock)
-#    Q2PiBlock = np.zeros((4,numPoints+2*bufferPts))
     
     pulseSeqs = []
     
     tmpPulseSeq = PulseSequence()
-    tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0)
-    tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2)
-    tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0)
-    tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2)
-    tmpPulseSeq.maxTimeStep = 2e-10
-    tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
+    tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0, controlType='sinusoidal')
+    tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, controlType='sinusoidal')
+    tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0, controlType='sinusoidal')
+    tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2, controlType='sinusoidal')
+    tmpPulseSeq.maxTimeStep = 1e-11
+#    tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
 
     #Q2Pi
     tmpPulseSeq.controlAmps = Q2PiBlock
@@ -166,17 +164,17 @@ if __name__ == '__main__':
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
     #Q2Pi Q1Pi
-    tmpPulseSeq.controlAmps = np.hstack((Q2PiBlock, jayBlock))
+    tmpPulseSeq.controlAmps = np.hstack((Q2PiBlock, Q1PiBlock))
     tmpPulseSeq.timeSteps = timeStep*np.ones(tmpPulseSeq.controlAmps.shape[1])
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
     #Q2Pi Q1Pi Q1Pi
-    tmpPulseSeq.controlAmps = np.hstack((Q2PiBlock, jayBlock, jayBlock))
+    tmpPulseSeq.controlAmps = np.hstack((Q2PiBlock, Q1PiBlock, Q1PiBlock))
     tmpPulseSeq.timeSteps = timeStep*np.ones(tmpPulseSeq.controlAmps.shape[1])
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
     #Q2Pi Q1Pi Q1Pi Q2Pi
-    tmpPulseSeq.controlAmps = np.hstack((Q2PiBlock, jayBlock, jayBlock, Q2PiBlock))
+    tmpPulseSeq.controlAmps = np.hstack((Q2PiBlock, Q1PiBlock, Q1PiBlock, Q2PiBlock))
     tmpPulseSeq.timeSteps = timeStep*np.ones(tmpPulseSeq.controlAmps.shape[1])
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
@@ -186,7 +184,7 @@ if __name__ == '__main__':
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
     #Q1 pi ref
-    tmpPulseSeq.controlAmps = jayBlock
+    tmpPulseSeq.controlAmps = Q1PiBlock
     tmpPulseSeq.timeSteps = timeStep*np.ones(tmpPulseSeq.controlAmps.shape[1])
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
@@ -196,7 +194,7 @@ if __name__ == '__main__':
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
     #Q1 pi + Q2 pi ref
-    tmpPulseSeq.controlAmps = np.hstack((jayBlock, Q2PiBlock))
+    tmpPulseSeq.controlAmps = np.hstack((Q1PiBlock, Q2PiBlock))
     tmpPulseSeq.timeSteps = timeStep*np.ones(tmpPulseSeq.controlAmps.shape[1])
     pulseSeqs.append(deepcopy(tmpPulseSeq))
     
@@ -206,11 +204,5 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(results.repeat(2))
     plt.show()
-    
-    
-    
-    
-    
-
     
     

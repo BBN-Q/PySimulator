@@ -42,8 +42,8 @@ systemParams.create_full_Ham()
 X = 0.5*(Q1.loweringOp + Q1.raisingOp)
 Y = 0.5*(-1j*Q1.loweringOp + 1j*Q1.raisingOp)
 #The cross-coupling from Q1 drive to Q2
-crossCoupling12 = 0.6
-crossCoupling21 = 0.6
+crossCoupling12 = 0.7
+crossCoupling21 = 0.7
 
 #Add the Q1 drive Hamiltonians
 systemParams.add_control_ham(inphase = Hamiltonian(systemParams.expand_operator('Q1', X) + crossCoupling12*systemParams.expand_operator('Q2', X)),
@@ -70,16 +70,18 @@ systemParams.add_control_ham(inphase = Hamiltonian(systemParams.expand_operator(
 #rhoIn[0,0] = 1
 
 
-sampRate = 2*1.2e9
+sampRate = 10*1.2e9
 timeStep = 1.0/sampRate
 
 drive1Freq = Q1.omega
 drive2Freq = Q2.omega
 
 pulseParams = PulseParams()
-pulseParams.timeSteps = timeStep*np.ones(144)
+pulseParams.timeSteps = timeStep*np.ones(1440)
 pulseParams.add_control_line(freq=-drive1Freq, initialPhase=0, bandwidth=300e6, maxAmp=100e6)
 pulseParams.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, bandwidth=300e6, maxAmp=100e6)
+#pulseParams.add_control_line(freq=-drive2Freq, initialPhase=0, bandwidth=300e6, maxAmp=100e6)
+#pulseParams.add_control_line(freq=-drive2Freq, initialPhase=-pi/2, bandwidth=300e6, maxAmp=100e6)
 pulseParams.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
 #pulseParams.H_int = Hamiltonian(Q1.omega*np.diag(np.arange(Q1.dim)))
 pulseParams.type = 'unitary'
@@ -100,11 +102,11 @@ pulseParams.rhoGoal = np.zeros((9,9), dtype=np.complex128)
 pulseParams.rhoGoal[3,3] = 1
 
 #Call the optimization    
-#optimize_pulse(pulseParams, systemParams)
+optimize_pulse(pulseParams, systemParams)
 
 #Decimate the pulse down to the AWG sampling rate
-#pulseParams.controlAmps = decimate(pulseParams.controlAmps, 10, n=5, axis=1)
-#pulseParams.timeSteps = 1e-9*np.ones(60)
+pulseParams.controlAmps = decimate(pulseParams.controlAmps, 10, n=5, axis=1)
+pulseParams.timeSteps = 1e-9*np.ones(60)
 
 
 '''
@@ -112,17 +114,23 @@ Look at the fidelity of some more traditional pulses
 '''
 
 #First a simple Gaussian 
-xPts = np.linspace(-2.5,2.5,1000)
-gaussPulse = np.exp(-0.5*(xPts**2)) - np.exp(-0.5*2.5**2)
-pulseInt = np.sum(gaussPulse)
-pulseTimes = 1e-9*np.arange(20,400,10)
-results = np.zeros(pulseTimes.size)
-for ct,pulseTime in enumerate(pulseTimes):
-    #Work out the scaling 
-    pulseScale = (0.5*gaussPulse.size)/(pulseTime*pulseInt)
-    pulseParams.controlAmps = pulseScale*np.vstack((gaussPulse, np.zeros(gaussPulse.size)))
-    pulseParams.timeSteps = (pulseTime/gaussPulse.size)*np.ones(gaussPulse.size)
-    tmpResult = simulate_sequence(pulseParams, systemParams, pulseParams.rhoStart, simType='unitary')
-    results[ct] = np.abs(np.trace(np.dot(pulseParams.Ugoal.conj().T, tmpResult[1])))**2/16
-
-
+#xPts = np.linspace(-2.5,2.5,1000)
+#gaussPulse = np.exp(-0.5*(xPts**2)) - np.exp(-0.5*2.5**2)
+#pulseInt = np.sum(gaussPulse)
+#pulseTimes = 1e-9*np.arange(20,400,10)
+#results = np.zeros(pulseTimes.size)
+#for ct,pulseTime in enumerate(pulseTimes):
+#    #Work out the scaling 
+#    pulseScale = (0.5*gaussPulse.size)/(pulseTime*pulseInt)
+#    pulseParams.controlAmps = pulseScale*np.vstack((gaussPulse, np.zeros(gaussPulse.size)))
+#    pulseParams.timeSteps = (pulseTime/gaussPulse.size)*np.ones(gaussPulse.size)
+#    tmpResult = simulate_sequence(pulseParams, systemParams, pulseParams.rhoStart, simType='unitary')
+#    results[ct] = np.abs(np.trace(np.dot(pulseParams.Ugoal.conj().T, tmpResult[1])))**2/16
+#
+#plt.figure()
+#plt.plot(pulseTimes*1e9, results)
+#
+##Now a Hermite 180
+#xPts = np.linspace(-2,2,1000)
+#Hermite180 = (1-0.956*xPts**2)*np.exp(-(xPts**2))
+#
