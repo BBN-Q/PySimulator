@@ -1,0 +1,13 @@
+env = Environment()
+
+CyBuilder = Builder(action = 'cython $CYTHONFLAGS $SOURCE', src_suffix='.pyx')
+
+
+env.Append(BUILDERS = {'CyBuilder': CyBuilder})
+
+#Setup for C++
+env.Append(CYTHONFLAGS = '--cplus')
+
+#Use Cython to parse the pyx file
+returnNodes = env.CyBuilder('CySim')
+print(returnNodes)
