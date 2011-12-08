@@ -34,9 +34,9 @@ if __name__ == '__main__':
     systemParams = SystemParams()
     
     #First the two qubits
-    Q1 = SCQubit(numLevels=3, omega=4.86359e9-1e6, delta=-300e6, name='Q1', T1=5.2e-6)
+    Q1 = SCQubit(numLevels=3, omega=4.863e9-1e6, delta=-300e6, name='Q1', T1=5.2e-6)
     systemParams.add_sub_system(Q1)
-    Q2 = SCQubit(numLevels=3, omega=5.19344e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
+    Q2 = SCQubit(numLevels=3, omega=5.193e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
     systemParams.add_sub_system(Q2)
  
     #Add a 2MHz ZZ interaction 
@@ -70,12 +70,13 @@ if __name__ == '__main__':
     rhoIn[0,0] = 1
 
     #First run 1D spectroscopy around the Bell-Rabi drive frequency
-    freqSweep = 1e9*np.linspace(5.01, 5.040, 30)
+    freqSweep = 1e9*np.linspace(5.01, 5.040, 1000)
 #    freqSweep = [5.023e9]
     ampSweep = np.linspace(-1,1,80)
-    x = np.linspace(-2,2,100)
+    x = np.linspace(-2,2,20)
     pulseAmps = (np.exp(-x**2)).reshape((1,x.size))
-#    ampSweep = [1]
+#    pulseAmps = np.ones((1,1))
+    ampSweep = [0.1]
     
     rabiFreq = 200e6
     
@@ -87,19 +88,20 @@ if __name__ == '__main__':
             tmpPulseSeq.add_control_line(freq=-freq, initialPhase=0)
             tmpPulseSeq.controlAmps = rabiFreq*controlAmp*pulseAmps
             tmpPulseSeq.timeSteps = 5e-9*np.ones(x.size)
-            tmpMat = np.diag(freq*np.arange(3, dtype=np.complex128))
+            tmpMat = freq*Q1.numberOp
             tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', tmpMat) + systemParams.expand_operator('Q2', tmpMat))
         
             pulseSeqs.append(tmpPulseSeq)
     
-    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
-    results.resize((freqSweep.size, ampSweep.size))
-    
-    plt.figure()
-#    plt.plot(ampSweep, results)
-#    plt.xlabel('Frequency')
-#    plt.ylabel('Measurement Voltage')
-#    plt.title('Two Qubit Bell-Rabi Spectroscopy')
-    plt.imshow(results, extent = [-1, 1, freqSweep[-1], freqSweep[0]], aspect='auto')
+    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='lindblad')[0]
+#    results.resize((freqSweep.size, ampSweep.size))
+    plt.plot(freqSweep,results)
     plt.show()
+#    plt.figure()
+##    plt.plot(ampSweep, results)
+##    plt.xlabel('Frequency')
+##    plt.ylabel('Measurement Voltage')
+##    plt.title('Two Qubit Bell-Rabi Spectroscopy')
+#    plt.imshow(results, extent = [-1, 1, freqSweep[-1], freqSweep[0]], aspect='auto')
+#    plt.show()
 

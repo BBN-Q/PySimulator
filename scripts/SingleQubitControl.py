@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 
 from scipy.constants import pi
+import scipy.optimize
 
 from PySim.SystemParams import SystemParams
 from PySim.QuantumSystems import Hamiltonian, Dissipator
@@ -24,13 +25,13 @@ if __name__ == '__main__':
     systemParams = SystemParams()
     
     #First the two qubits
-    Q1 = SCQubit(numLevels=3, omega=4.86359e9-1e6, delta=-300e6, name='Q1', T1=5.2e-6)
+    Q1 = SCQubit(numLevels=3, omega=4.863e9, delta=-300e6, name='Q1', T1=5.2e-6)
     systemParams.add_sub_system(Q1)
-    Q2 = SCQubit(numLevels=3, omega=5.19344e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
+    Q2 = SCQubit(numLevels=3, omega=5.193e9, delta=-313.656e6, name='Q2', T1=4.4e-6)
     systemParams.add_sub_system(Q2)
  
     #Add a 2MHz ZZ interaction 
-    systemParams.add_interaction('Q1', 'Q2', 'ZZ', -2e6)
+    systemParams.add_interaction('Q1', 'Q2', 'FlipFlop', -4.25e6)
    
     #Create the full Hamiltonian   
     systemParams.create_full_Ham()
@@ -65,9 +66,7 @@ if __name__ == '__main__':
     systemParams.dissipators.append(Dissipator(systemParams.expand_operator('Q2', Q2.T1Dissipator)))
     
     #Setup the initial state as the ground state
-    rhoIn = np.zeros((systemParams.dim, systemParams.dim))
-    rhoIn[0,0] = 1
-    
+    rhoIn = np.kron(Q1.levelProjector(0), Q2.levelProjector(1))
     
     sampRate = 1.2e9
     timeStep = 1.0/sampRate
@@ -101,11 +100,13 @@ if __name__ == '__main__':
 #    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
 #    
     #Calibrates to 9.51MHz as expected
-    Q1Cal = 2*0.5/(np.sum(gaussPulse)*timeStep)
+    Q1Cal = 0.5/(np.sum(gaussPulse)*timeStep)
     bufferPts = 2
     Q1PiPulse = np.zeros((4,numPoints))
     Q1PiPulse[0] = Q1Cal*gaussPulse
     Q1PiBlock = np.hstack((np.zeros((4,bufferPts)), Q1PiPulse, np.zeros((4,bufferPts))))
+    Q1Pi2Block = np.hstack((np.zeros((4,bufferPts)), 0.5*Q1PiPulse, np.zeros((4,bufferPts))))
+    Q1TimePts = timeStep*np.ones(Q1PiBlock.shape[1])
 
     
     #Calibrate the Q2 pi DRAG pulse
@@ -117,35 +118,64 @@ if __name__ == '__main__':
     tmpControls[2] = gaussPulse
     tmpControls[3] = dragCorrection
     
-    #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
-#    pulseSeqs = []
-#    for nutFreq in nutFreqs:
-#        tmpPulseSeq = PulseSequence()
-#        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0)
-#        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2)
-#        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0)
-#        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2)
-#        tmpPulseSeq.controlAmps = nutFreq*tmpControls
-#        tmpPulseSeq.timeSteps = timeStep*np.ones(tmpControls.shape[1])
-#        tmpPulseSeq.maxTimeStep = 5e-10
-#        tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', np.diag(drive1Freq*np.arange(Q1.dim, dtype=np.complex128))) + systemParams.expand_operator('Q2', np.diag(drive2Freq*np.arange(Q2.dim, dtype=np.complex128))))
-#        pulseSeqs.append(tmpPulseSeq)
-#
-#    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
-#
-#    plt.figure()
-#    plt.plot(nutFreqs/1e6, results)
-#    plt.show()
-#    
     #Calibrates to 21.58MHz
-    Q2Cal = 2*0.5/(np.sum(gaussPulse)*timeStep)
+    Q2Cal = 0.5/(np.sum(gaussPulse)*timeStep)
     Q2PiBlock = np.zeros((4,numPoints+2*bufferPts))
     Q2PiBlock[2,2:-2] = gaussPulse
     Q2PiBlock[3,2:-2] = dragCorrection
     Q2PiBlock *= Q2Cal
     
-    #Run the actual pi-pi-pi-pi experiment
+
+    #Run a Ramsey experiment
+    #Setup the pulseSequences
+    delays = np.linspace(0,8e-6,200)
+    pulseSeqs = []
+    drive1Freq = 4.863e9
+    drive2Freq = 5.193e9
     
+    JStrengths = np.linspace(0,6e6,3)
+    RamseyFreqs = []
+#    for JStrength in JStrengths:
+#        systemParams.interactions[0].interactionStrength = -JStrength
+#        systemParams.create_full_Ham()
+#        pulseSeqs = []
+    for delay in delays:
+        tmpPulseSeq = PulseSequence()
+        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0, controlType='rotating')
+        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, controlType='rotating')
+        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0, controlType='rotating')
+        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2, controlType='rotating')
+        #Pulse sequence is X90, delay, X90
+        tmpPulseSeq.controlAmps = np.hstack((Q1Pi2Block, np.zeros((4,1)), Q1Pi2Block))
+        tmpPulseSeq.timeSteps = np.hstack((Q1TimePts, np.array([delay]), Q1TimePts))
+        #Interaction frame at the drive frequency
+        tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', drive1Freq*Q1.numberOp) + systemParams.expand_operator('Q2', drive1Freq*Q2.numberOp))
+        
+        pulseSeqs.append(tmpPulseSeq)
+        
+    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
+    
+    #Fit the data
+    def fitfunc(p,x):
+        return p[0]*np.sin(2*pi*p[1]*x+p[2]) + p[3]
+    def errfunc(p,x,data):
+        return fitfunc(p,x) - data
+    powerSpec = np.abs(np.fft.fft(results-np.mean(results)))
+    freqs = np.fft.fftfreq(results.size, delays[1]-delays[0])
+    freqGuess = np.abs(freqs[np.argmax(powerSpec)])
+    meanGuess = np.mean(results)
+    p0 = [-0.1, freqGuess, 0, meanGuess]
+    p1, success = scipy.optimize.leastsq(errfunc, p0[:], args=(delays, results))
+    
+    plt.figure()
+    plt.plot(delays*1e6, results)
+    plt.plot(delays*1e6,fitfunc(p1,delays))
+    plt.show()    
+#        RamseyFreqs.append(p1[1])
+    
+    
+    '''
+    #Run the actual pi-pi-pi-pi experiment
     #Setup the pulse sequence blocks
     
     pulseSeqs = []
@@ -204,5 +234,5 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(results.repeat(2))
     plt.show()
-    
+    '''
     
