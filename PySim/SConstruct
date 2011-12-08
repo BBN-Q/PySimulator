@@ -1,10 +1,27 @@
+#We need distutils to get the location of the python headers and numpy to get the numpy headers
 import distutils.sysconfig
 import numpy
 
+#Setup the initial environment with the path from the distutils to the python header files
 env = Environment(CPPPATH=[distutils.sysconfig.get_python_inc()])
 
+#Create a command line builder for the cython build step as it is not built into scons
 CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus -o $TARGET $SOURCE')
+
+#Load the location of the eigen headers and append it and the numpy header location to the include path
 EIGENDIR = ARGUMENTS.get('EIGENDIR')
 env.Append(CPPPATH=[EIGENDIR, numpy.get_include()])
-CyModule = env.SharedLibrary('CySim', ['CPPBackEnd.cpp', CyBuilder])
+
+#Set our optimization parameters based on whether we are in debug mode or not
+debugFlag = int(ARGUMENTS.get('debug', 0))
+if debugFlag:
+    env.Append(CPPFLAGS=['-g'])
+else:
+    env.Append(CPPFLAGS=['-O3'])
+    env.Append(CPPDEFINES=['NDEBUG'])
+    
+#For python modules we don't need the lib prefix
+env.Replace(SHLIBPREFIX='')
+#Define the shared library target for building 
+CyModule = env.SharedLibrary(target='CySim', source=['CPPBackEnd.cpp', CyBuilder])
 
