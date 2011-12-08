@@ -133,45 +133,46 @@ if __name__ == '__main__':
     drive1Freq = 4.863e9
     drive2Freq = 5.193e9
     
-    JStrengths = np.linspace(0,6e6,3)
+    JStrengths = np.linspace(0.1,6e6,30)
     RamseyFreqs = []
-#    for JStrength in JStrengths:
-#        systemParams.interactions[0].interactionStrength = -JStrength
-#        systemParams.create_full_Ham()
-#        pulseSeqs = []
-    for delay in delays:
-        tmpPulseSeq = PulseSequence()
-        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0, controlType='rotating')
-        tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, controlType='rotating')
-        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0, controlType='rotating')
-        tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2, controlType='rotating')
-        #Pulse sequence is X90, delay, X90
-        tmpPulseSeq.controlAmps = np.hstack((Q1Pi2Block, np.zeros((4,1)), Q1Pi2Block))
-        tmpPulseSeq.timeSteps = np.hstack((Q1TimePts, np.array([delay]), Q1TimePts))
-        #Interaction frame at the drive frequency
-        tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', drive1Freq*Q1.numberOp) + systemParams.expand_operator('Q2', drive1Freq*Q2.numberOp))
+    for JStrength in JStrengths:
+        systemParams.interactions[0].interactionStrength = -JStrength
+        systemParams.interactions[0].createMat()
+        systemParams.create_full_Ham()
+        pulseSeqs = []
+        for delay in delays:
+            tmpPulseSeq = PulseSequence()
+            tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=0, controlType='rotating')
+            tmpPulseSeq.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, controlType='rotating')
+            tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=0, controlType='rotating')
+            tmpPulseSeq.add_control_line(freq=-drive2Freq, initialPhase=-pi/2, controlType='rotating')
+            #Pulse sequence is X90, delay, X90
+            tmpPulseSeq.controlAmps = np.hstack((Q1Pi2Block, np.zeros((4,1)), Q1Pi2Block))
+            tmpPulseSeq.timeSteps = np.hstack((Q1TimePts, np.array([delay]), Q1TimePts))
+            #Interaction frame at the drive frequency
+            tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', drive1Freq*Q1.numberOp) + systemParams.expand_operator('Q2', drive1Freq*Q2.numberOp))
+            
+            pulseSeqs.append(tmpPulseSeq)
         
-        pulseSeqs.append(tmpPulseSeq)
+        results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
+    
+        #Fit the data
+        def fitfunc(p,x):
+            return p[0]*np.sin(2*pi*p[1]*x+p[2]) + p[3]
+        def errfunc(p,x,data):
+            return fitfunc(p,x) - data
+        powerSpec = np.abs(np.fft.fft(results-np.mean(results)))
+        freqs = np.fft.fftfreq(results.size, delays[1]-delays[0])
+        freqGuess = np.abs(freqs[np.argmax(powerSpec)])
+        meanGuess = np.mean(results)
+        p0 = [-0.1, freqGuess, 0, meanGuess]
+        p1, success = scipy.optimize.leastsq(errfunc, p0[:], args=(delays, results))
         
-    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
-    
-    #Fit the data
-    def fitfunc(p,x):
-        return p[0]*np.sin(2*pi*p[1]*x+p[2]) + p[3]
-    def errfunc(p,x,data):
-        return fitfunc(p,x) - data
-    powerSpec = np.abs(np.fft.fft(results-np.mean(results)))
-    freqs = np.fft.fftfreq(results.size, delays[1]-delays[0])
-    freqGuess = np.abs(freqs[np.argmax(powerSpec)])
-    meanGuess = np.mean(results)
-    p0 = [-0.1, freqGuess, 0, meanGuess]
-    p1, success = scipy.optimize.leastsq(errfunc, p0[:], args=(delays, results))
-    
-    plt.figure()
-    plt.plot(delays*1e6, results)
-    plt.plot(delays*1e6,fitfunc(p1,delays))
-    plt.show()    
-#        RamseyFreqs.append(p1[1])
+        plt.figure()
+        plt.plot(delays*1e6, results)
+        plt.plot(delays*1e6,fitfunc(p1,delays))
+        plt.show()    
+        RamseyFreqs.append(p1[1])
     
     
     '''
