@@ -1,13 +1,10 @@
-env = Environment()
+import distutils.sysconfig
+import numpy
 
-CyBuilder = Builder(action = 'cython $CYTHONFLAGS $SOURCE', src_suffix='.pyx')
+env = Environment(CPPPATH=[distutils.sysconfig.get_python_inc()])
 
+CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus -o $TARGET $SOURCE')
+EIGENDIR = ARGUMENTS.get('EIGENDIR')
+env.Append(CPPPATH=[EIGENDIR, numpy.get_include()])
+CyModule = env.SharedLibrary('CySim', ['CPPBackEnd.cpp', CyBuilder])
 
-env.Append(BUILDERS = {'CyBuilder': CyBuilder})
-
-#Setup for C++
-env.Append(CYTHONFLAGS = '--cplus')
-
-#Use Cython to parse the pyx file
-returnNodes = env.CyBuilder('CySim')
-print(returnNodes)

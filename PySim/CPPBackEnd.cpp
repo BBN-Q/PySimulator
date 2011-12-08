@@ -8,7 +8,7 @@
 
 #include "CPPBackEnd.h"
 
-void evolution_unitary(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, double ** Hcontrols, complex * totU){
+void evolution_unitary(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, double ** Hcontrols, cdouble * totU){
 
 	cout << "Got here!";
 }

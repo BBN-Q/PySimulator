@@ -15,6 +15,8 @@
 #include <Eigen/StdVector>
 #include <unsupported/Eigen/MatrixFunctions>
 
+typedef std::complex<double> cdouble;
+
 using Eigen::Matrix;
 using Eigen::MatrixXd;
 using Eigen::Matrix4d;
@@ -44,7 +46,7 @@ using std::endl;
 
 //Forward declarations of the functions
 
-void evolution_unitary(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, double ** Hcontrols, complex * totU);
+void evolution_unitary(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, double ** Hcontrols, cdouble * totU);
 
 
 #endif /* CPPBACKEND_H__ */
