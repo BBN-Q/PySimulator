@@ -67,6 +67,13 @@ class SNO(QuantumSystem):
         Create the lowering operator under the linear harmonic oscillator function. This may not be true with a cavity.
         '''
         return np.diag(np.sqrt(np.arange(1,self.dim, dtype=np.complex128)), 1)
+    
+    @property
+    def numberOp(self):
+        '''
+        Create the number operator
+        '''
+        return np.diag(np.arange(self.dim, dtype=np.complex128))
 
     def levelProjector(self, level):
         '''
@@ -197,12 +204,13 @@ class Interaction(object):
     
     def createMat(self):
         ''' Create the matrix representation of the interaction. '''
-        if self.matrix is None:
-            #Work it out for different interaction types
-            if self.interactionType == 'ZZ':
-                self.matrix = 0.25*self.interactionStrength*np.kron(self.system1.pauliZ, self.system2.pauliZ)
-            else:
-                raise NameError('Unknown interaction type.')
+        #Work it out for different interaction types
+        if self.interactionType == 'ZZ':
+            self.matrix = 0.25*self.interactionStrength*np.kron(self.system1.pauliZ, self.system2.pauliZ)
+        elif self.interactionType == 'FlipFlop':
+            self.matrix = self.interactionStrength*(np.kron(self.system1.loweringOp, self.system2.raisingOp) + np.kron(self.system1.raisingOp, self.system2.loweringOp))
+        else:
+            raise NameError('Unknown interaction type.')
     
             
 def expand_hilbert_space(operator, operatorSubSystems, eyeSubSystems, dimensions):

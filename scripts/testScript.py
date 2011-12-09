@@ -34,9 +34,9 @@ if __name__ == '__main__':
     systemParams = SystemParams()
     
     #First the two qubits
-    Q1 = SCQubit(numLevels=3, omega=4.86359e9-1e6, delta=-300e6, name='Q1', T1=5.2e-6)
+    Q1 = SCQubit(numLevels=3, omega=4.863e9-1e6, delta=-300e6, name='Q1', T1=5.2e-6)
     systemParams.add_sub_system(Q1)
-    Q2 = SCQubit(numLevels=3, omega=5.19344e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
+    Q2 = SCQubit(numLevels=3, omega=5.193e9-1e6, delta=-313.656e6, name='Q2', T1=4.4e-6)
     systemParams.add_sub_system(Q2)
  
     #Add a 2MHz ZZ interaction 
@@ -49,15 +49,17 @@ if __name__ == '__main__':
     X = 0.5*(Q1.loweringOp + Q1.raisingOp)
     Y = 0.5*(-1j*Q1.loweringOp + 1j*Q2.raisingOp)
     #The cross-coupling from Q1 drive to Q2
-    crossCoupling = 0.5
+    crossCoupling = 1
     
     #Add the Q1 drive Hamiltonians
     systemParams.add_control_ham(inphase = Hamiltonian(systemParams.expand_operator('Q1', X) + crossCoupling*systemParams.expand_operator('Q2', X)),
                                   quadrature = Hamiltonian(systemParams.expand_operator('Q1', Y) + crossCoupling*systemParams.expand_operator('Q2', Y)))
     
     #Setup the measurement operator
-#    systemParams.measurement = -systemParams.expand_operator('Q1', Q1.pauliZ) - systemParams.expand_operator('Q2', Q2.pauliZ)
-    systemParams.measurement = 0.6057*np.eye(9) + 0.0176*systemParams.expand_operator('Q1', Q1.pauliZ) + 0.0155*systemParams.expand_operator('Q2', Q2.pauliZ) - 0.0074*np.kron(Q1.pauliZ, Q2.pauliZ)
+    systemParams.measurement = np.kron(Q1.levelProjector(1), Q2.levelProjector(1))
+#    systemParams.measurement = 0.5*np.kron(Q1.levelProjector(0), Q2.levelProjector(0)) + 0.67*np.kron(Q1.levelProjector(1), Q2.levelProjector(0)) + \
+#                                0.64*np.kron(Q1.levelProjector(0), Q2.levelProjector(1)) + 0.72*np.kron(Q1.levelProjector(0), Q2.levelProjector(2)) + \
+#                                0.75*np.kron(Q1.levelProjector(1), Q2.levelProjector(1))
 
     #Add the T1 dissipators
     systemParams.dissipators.append(Dissipator(systemParams.expand_operator('Q1', Q1.T1Dissipator)))
@@ -68,14 +70,15 @@ if __name__ == '__main__':
     rhoIn[0,0] = 1
 
     #First run 1D spectroscopy around the Bell-Rabi drive frequency
-    freqSweep = 1e9*np.linspace(5.02, 5.040, 20)
+    freqSweep = 1e9*np.linspace(5.01, 5.040, 1000)
 #    freqSweep = [5.023e9]
     ampSweep = np.linspace(-1,1,80)
-    x = np.linspace(-2,2,120)
+    x = np.linspace(-2,2,20)
     pulseAmps = (np.exp(-x**2)).reshape((1,x.size))
-#    ampSweep = [1]
+#    pulseAmps = np.ones((1,1))
+    ampSweep = [0.1]
     
-    rabiFreq = 175e6
+    rabiFreq = 200e6
     
     #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
     pulseSeqs = []
@@ -85,20 +88,20 @@ if __name__ == '__main__':
             tmpPulseSeq.add_control_line(freq=-freq, initialPhase=0)
             tmpPulseSeq.controlAmps = rabiFreq*controlAmp*pulseAmps
             tmpPulseSeq.timeSteps = 5e-9*np.ones(x.size)
-            tmpPulseSeq.maxTimeStep = 1e-6
-            tmpMat = np.diag(freq*np.arange(3, dtype=np.complex128))
+            tmpMat = freq*Q1.numberOp
             tmpPulseSeq.H_int = Hamiltonian(systemParams.expand_operator('Q1', tmpMat) + systemParams.expand_operator('Q2', tmpMat))
         
             pulseSeqs.append(tmpPulseSeq)
     
-    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
-    results.resize((freqSweep.size, ampSweep.size))
-    
-    plt.figure()
-#    plt.plot(ampSweep, results)
-#    plt.xlabel('Frequency')
-#    plt.ylabel('Measurement Voltage')
-#    plt.title('Two Qubit Bell-Rabi Spectroscopy')
-    plt.imshow(results, extent = [-1, 1, freqSweep[-1], freqSweep[0]], aspect='auto')
+    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='lindblad')[0]
+#    results.resize((freqSweep.size, ampSweep.size))
+    plt.plot(freqSweep,results)
     plt.show()
+#    plt.figure()
+##    plt.plot(ampSweep, results)
+##    plt.xlabel('Frequency')
+##    plt.ylabel('Measurement Voltage')
+##    plt.title('Two Qubit Bell-Rabi Spectroscopy')
+#    plt.imshow(results, extent = [-1, 1, freqSweep[-1], freqSweep[0]], aspect='auto')
+#    plt.show()
 
