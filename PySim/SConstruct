@@ -12,6 +12,9 @@ CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus -o $TARGET $SOUR
 EIGENDIR = ARGUMENTS.get('EIGENDIR')
 env.Append(CPPPATH=[EIGENDIR, numpy.get_include()])
 
+#Since we interact with numpy we'll use row major storage
+env.Append(CPPDEFINES=['EIGEN_DEFAULT_TO_ROW_MAJOR'])
+
 #Set our optimization parameters based on whether we are in debug mode or not
 debugFlag = int(ARGUMENTS.get('debug', 0))
 if debugFlag:

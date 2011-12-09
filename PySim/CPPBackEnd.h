@@ -15,38 +15,26 @@
 #include <Eigen/StdVector>
 #include <unsupported/Eigen/MatrixFunctions>
 
-typedef std::complex<double> cdouble;
 
 using Eigen::Matrix;
-using Eigen::MatrixXd;
-using Eigen::Matrix4d;
-using Eigen::Matrix3d;
-
-using Eigen::Matrix3cd;
-using Eigen::Vector3cd;
-
-using Eigen::MatrixXi;
-using Eigen::Vector3i;
-
-using Eigen::VectorXd;
-using Eigen::Vector3d;
-using Eigen::Vector4d;
+using Eigen::MatrixXcd;
 
 using Eigen::MatrixBase;
 using Eigen::Map;
 
-using Eigen::AngleAxisd;
-
 const double PI = 2*acos(0.0);
 const double TWOPI = 2*PI;
-
 
 using std::cout;
 using std::endl;
 
+typedef std::complex<double> cdouble;
+typedef Map<MatrixXcd> Mapcd;
+
+
 //Forward declarations of the functions
 
-void evolution_unitary(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, double ** Hcontrols, cdouble * totU);
+void evolution_unitary_CPP(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, cdouble ** Hcontrols, cdouble * totU);
 
 
 #endif /* CPPBACKEND_H__ */
