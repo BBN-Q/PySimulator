@@ -72,14 +72,14 @@ systemParams.add_control_ham(inphase = Hamiltonian(systemParams.expand_operator(
 #rhoIn[0,0] = 1
 
 
-sampRate = 10*1.2e9
+sampRate = 1.2e9
 timeStep = 1.0/sampRate
 
 drive1Freq = Q1.omega-1e6
 drive2Freq = Q2.omega-1e6
 
 pulseParams = PulseParams()
-pulseParams.timeSteps = timeStep*np.ones(10*144)
+pulseParams.timeSteps = timeStep*np.ones(144)
 pulseParams.add_control_line(freq=-drive1Freq, initialPhase=0, bandwidth=300e6, maxAmp=100e6)
 pulseParams.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, bandwidth=300e6, maxAmp=100e6)
 #pulseParams.add_control_line(freq=-drive2Freq, initialPhase=0, bandwidth=300e6, maxAmp=100e6)
