@@ -104,11 +104,12 @@ pulseParams.rhoGoal[3,3] = 1
 
 #Call the optimization
 pulseParams.fTol = 0.5e-3
-pulseParams.maxfun = 20
+pulseParams.maxfun = None
+pulseParams.derivType = 'exact'
 optimize_pulse(pulseParams, systemParams)
 
 #Decimate the pulse down to the AWG sampling rate
-pulseParams.controlAmps = decimate(pulseParams.controlAmps, 10, n=5, axis=1)
+#pulseParams.controlAmps = decimate(pulseParams.controlAmps, 10, n=5, axis=1)
 
 
 '''
