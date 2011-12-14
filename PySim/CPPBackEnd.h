@@ -9,21 +9,26 @@
 #include <vector>
 #include <complex>
 #include <math.h>
-#include <string>
+
+#include <stdio.h>
 
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 #include <unsupported/Eigen/MatrixFunctions>
 
-
-using Eigen::Matrix;
 using Eigen::MatrixXcd;
+
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
 
 using Eigen::MatrixBase;
 using Eigen::Map;
 
+using Eigen::SelfAdjointEigenSolver;
+
 const double PI = 2*acos(0.0);
 const double TWOPI = 2*PI;
+const std::complex<double> i = std::complex<double>(0,1);
 
 using std::cout;
 using std::endl;
@@ -34,8 +39,16 @@ typedef Map<MatrixXcd> Mapcd;
 class ControlHam
 {
 public:
-	cdouble * inphase;
-	cdouble * quadrature;
+	cdouble * inphasePtr;
+	cdouble * quadraturePtr;
+};
+
+class ControlLine
+{
+public:
+	double freq;
+	double phase;
+	int controlType; // 0 for linear 1 for rotating
 };
 
 //Some classes/structures to nicely store the data
@@ -43,7 +56,11 @@ class PulseSequence{
 public:
 	size_t numControlLines;
 	size_t numTimeSteps;
-	double * timeSteps;
+	double * timeStepsPtr;
+	double maxTimeStep;
+	double * controlAmpsPtr;
+	std::vector<ControlLine> controlLines;
+	cdouble * H_intPtr;
 };
 
 class SystemParams{
@@ -51,7 +68,7 @@ public:
 	size_t numControlHams;
 	size_t dim;
 	std::vector<ControlHam> controlHams;
-	cdouble * Hnat;
+	cdouble * HnatPtr;
 };
 
 //Forward declarations of the functions

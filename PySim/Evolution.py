@@ -15,6 +15,13 @@ from scipy.linalg import expm
 
 from copy import deepcopy
 
+#Try to load the CPPBackEnd
+try:
+    import PySim.CySim
+    CPPBackEnd = True
+except ImportError:
+    CPPBackEnd = False
+    
 def evolution_unitary(pulseSequence, systemParams):
     '''
     Main function for evolving a state under unitary conditions
@@ -23,48 +30,51 @@ def evolution_unitary(pulseSequence, systemParams):
     #Some error checking
     assert pulseSequence.numControlLines==systemParams.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
     
-    totU = np.eye(systemParams.dim)
+    if CPPBackEnd:
+        return PySim.CySim.Cy_evolution_unitary(pulseSequence, systemParams)
+    else:
     
-    #Loop over each timestep in the sequence
-    curTime = 0.0
-    for timect, timeStep in enumerate(pulseSequence.timeSteps):
-        tmpTime = 0.0 
-        #Loop over the sub-pixels if we have a finer discretization
-        while tmpTime < timeStep:
-            #Choose the minimum of the time left or the sub pixel timestep
-            subTimeStep = np.minimum(timeStep-tmpTime, pulseSequence.maxTimeStep)
-
-            #Initialize the Hamiltonian to the drift Hamiltonian
-            Htot = deepcopy(systemParams.Hnat)
-            
-            #Add each of the control Hamiltonians
-            for controlct, tmpControl in enumerate(pulseSequence.controlLines):
-                tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.initialPhase
-                if tmpControl.controlType == 'rotating':
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix
-                elif tmpControl.controlType == 'sinusoidal':
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix
+        totU = np.eye(systemParams.dim)
+        
+        #Loop over each timestep in the sequence
+        curTime = 0.0
+        for timect, timeStep in enumerate(pulseSequence.timeSteps):
+            tmpTime = 0.0 
+            #Loop over the sub-pixels if we have a finer discretization
+            while tmpTime < timeStep:
+                #Choose the minimum of the time left or the sub pixel timestep
+                subTimeStep = np.minimum(timeStep-tmpTime, pulseSequence.maxTimeStep)
+    
+                #Initialize the Hamiltonian to the drift Hamiltonian
+                Htot = deepcopy(systemParams.Hnat)
+                
+                #Add each of the control Hamiltonians
+                for controlct, tmpControl in enumerate(pulseSequence.controlLines):
+                    tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.phase
+                    if tmpControl.controlType == 'rotating':
+                        tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix
+                    elif tmpControl.controlType == 'sinusoidal':
+                        tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix
+                    else:
+                        raise TypeError('Unknown control type.')
+                    tmpMat *= pulseSequence.controlAmps[controlct,timect]
+                    Htot += tmpMat
+    
+                
+                if pulseSequence.H_int is not None:
+                    #Move the total Hamiltonian into the interaction frame
+                    Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
+                    #Propagate the unitary
+                    totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.interactionMatrix),totU)
                 else:
-                    raise TypeError('Unknown control type.')
-                tmpMat *= pulseSequence.controlAmps[controlct,timect]
-                Htot += tmpMat
-
-            
-
-            if pulseSequence.H_int is not None:
-                #Move the total Hamiltonian into the interaction frame
-                Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
-                #Propagate the unitary
-                totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.interactionMatrix),totU)
-            else:
-                #Propagate the unitary
-                totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.matrix),totU)
-            
-            #Update the times
-            tmpTime += subTimeStep
-            curTime += subTimeStep
-            
-    return totU
+                    #Propagate the unitary
+                    totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.matrix),totU)
+                
+                #Update the times
+                tmpTime += subTimeStep
+                curTime += subTimeStep
+                
+        return totU
 
     
 def evolution_lindblad(pulseSequence, systemParams, rhoIn):
@@ -99,7 +109,7 @@ def evolution_lindblad(pulseSequence, systemParams, rhoIn):
             
             #Add each of the control Hamiltonians
             for controlct, tmpControl in enumerate(pulseSequence.controlLines):
-                tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.initialPhase
+                tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.phase
                 if tmpControl.controlType == 'rotating':
                     tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix
                 elif tmpControl.controlType == 'sinusoidal':

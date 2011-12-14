@@ -9,9 +9,10 @@ class ControlLine(object):
     '''
     A class for control line: basically a modulated microwave carrier. 
     '''
-    def __init__(self, freq = 0, initialPhase = 0, controlType = None, bandwidth=np.inf, maxAmp=np.inf):
+    def __init__(self, freq = 0, phase = 0, controlType = None, bandwidth=np.inf, maxAmp=np.inf):
         self.freq = freq
-        self.initialPhase = initialPhase
+        self.phase = phase
+        #Whether we are taking a rotational or linearly polarized component
         self.controlType = 'rotating' if controlType == None else controlType
         self.bandwidth = bandwidth
         self.maxAmp = maxAmp
