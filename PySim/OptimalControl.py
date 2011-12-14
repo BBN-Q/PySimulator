@@ -22,6 +22,8 @@ import matplotlib.pyplot as plt
 from PulseSequence import PulseSequence
 from QuantumSystems import Hamiltonian
 
+from Evolution import expm_eigen
+
 class PulseParams(PulseSequence):
     '''
     For now just a container for pulse optimization parameters.  Subclasses a PulseSequence as it has to define similar things.
@@ -105,9 +107,7 @@ def evolution_unitary(optimParams, systemParams, controlHams):
 
         #Propagate the unitary
         totHams[timect] = Htot.matrix
-        Ds[timect], Vs[timect] = eigh(Htot.matrix)
-        timeStepUs[timect] = np.dot(Vs[timect], np.exp(-1j*2*pi*timeStep*Ds[timect]).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*Vs[timect].conj().T)
-        
+        timeStepUs[timect], Ds[timect], Vs[timect] = expm_eigen(Htot.matrix, -1j*2*pi*timeStep)
         totU = np.dot(timeStepUs[timect],totU)
         
         #Update the times
@@ -211,10 +211,8 @@ def eval_derivs(optimParams, systemParams, controlHams):
 
                 elif optimParams.derivType == 'finiteDiff':
                     #Finite difference approach
-                    tmpD, tmpV = eigh(totHams[timect] + 1e-6*controlHams[controlct,timect])
-                    tmpU1 = np.dot(tmpV, np.exp(-1j*tmpTimeStep*tmpD).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*tmpV.conj().T)
-                    tmpD, tmpV = eigh(totHams[timect] - 1e-6*controlHams[controlct,timect])
-                    tmpU2 = np.dot(tmpV, np.exp(-1j*tmpTimeStep*tmpD).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*tmpV.conj().T)
+                    tmpU1 = expm_eigen(totHams[timect] + 1e-6*controlHams[controlct,timect], -1j*tmpTimeStep)[0]
+                    tmpU2 = expm_eigen(totHams[timect] - 1e-6*controlHams[controlct,timect], -1j*tmpTimeStep)[0]
                     dUjduk = (tmpU1-tmpU2)/2e-6
                     if timect == 0:
                         derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*dUjduk) * curOverlap)

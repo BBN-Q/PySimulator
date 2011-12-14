@@ -11,7 +11,7 @@ import numpy as np
 from numpy import sin, cos
 
 from scipy.constants import pi
-from scipy.linalg import expm
+from scipy.linalg import expm, eigh
 
 from copy import deepcopy
 
@@ -21,6 +21,16 @@ try:
     CPPBackEnd = True
 except ImportError:
     CPPBackEnd = False
+    
+    
+def expm_eigen(matIn, mult):
+    '''
+    Helper function to compute matrix exponential of Hermitian matrix
+    '''
+    dim = matIn.shape[0]
+    D, V = eigh(matIn)
+    return np.dot(V, np.exp(mult*D).repeat(dim).reshape((dim, dim))*V.conj().T), D, V
+
     
 def evolution_unitary(pulseSequence, systemParams):
     '''
@@ -65,10 +75,10 @@ def evolution_unitary(pulseSequence, systemParams):
                     #Move the total Hamiltonian into the interaction frame
                     Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
                     #Propagate the unitary
-                    totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.interactionMatrix),totU)
+                    totU = np.dot(expm_eigen(Htot.interactionMatrix,-1j*2*pi*subTimeStep),totU)
                 else:
                     #Propagate the unitary
-                    totU = np.dot(expm(-1j*2*pi*subTimeStep*Htot.matrix),totU)
+                    totU = np.dot(expm_eigen(Htot.matrix,-1j*2*pi*subTimeStep),totU)
                 
                 #Update the times
                 tmpTime += subTimeStep
