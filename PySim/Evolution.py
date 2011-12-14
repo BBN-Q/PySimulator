@@ -75,10 +75,10 @@ def evolution_unitary(pulseSequence, systemParams):
                     #Move the total Hamiltonian into the interaction frame
                     Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
                     #Propagate the unitary
-                    totU = np.dot(expm_eigen(Htot.interactionMatrix,-1j*2*pi*subTimeStep),totU)
+                    totU = np.dot(expm_eigen(Htot.interactionMatrix,-1j*2*pi*subTimeStep)[0],totU)
                 else:
                     #Propagate the unitary
-                    totU = np.dot(expm_eigen(Htot.matrix,-1j*2*pi*subTimeStep),totU)
+                    totU = np.dot(expm_eigen(Htot.matrix,-1j*2*pi*subTimeStep)[0],totU)
                 
                 #Update the times
                 tmpTime += subTimeStep
