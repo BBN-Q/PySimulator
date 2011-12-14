@@ -81,6 +81,7 @@ class Test(unittest.TestCase):
         pulseParams.add_control_line(freq=-Q1.omega, initialPhase=-np.pi/2, bandwidth=300e6, maxAmp=200e6)
         pulseParams.H_int = Hamiltonian((Q1.omega)*np.diag(np.arange(Q1.dim)))
         pulseParams.type = 'unitary'
+        pulseParams.derivType = 'finiteDiff'
         
         #Start with a Gaussian
         tmpGauss = np.exp(-np.linspace(-2,2,numPoints)**2)

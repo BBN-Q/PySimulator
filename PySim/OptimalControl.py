@@ -15,7 +15,9 @@ from copy import deepcopy
 from scipy.constants import pi
 from scipy.linalg import expm
 from scipy.linalg import eigh
-from scipy.optimize import fmin_tnc, tnc
+from scipy.optimize import fmin_l_bfgs_b
+
+import matplotlib.pyplot as plt
 
 from PulseSequence import PulseSequence
 from QuantumSystems import Hamiltonian
@@ -30,15 +32,15 @@ class PulseParams(PulseSequence):
         self.numPoints = 0
         self.startControlAmps = None  #Initial guess for the pulse
         self.fTol = 1e-4    #optimization paramter: will exit when difference in fidelity is less than this. 
-        self.maxfun = None
-        self.derivType = 'exact'
+        self.maxfun = 15000
+        self.derivType = 'approx'
 
 def create_random_pulse(numChannels, numPoints):
     '''
     Helper function to create smooth pulse starting point.
     '''
     #TODO: return something besides ones
-    return 1e3*np.ones((numChannels, numPoints))
+    return 1e6*np.ones((numChannels, numPoints))
 
 
 def calc_control_Hams(optimParams, systemParams):
@@ -104,7 +106,7 @@ def evolution_unitary(optimParams, systemParams, controlHams):
         #Propagate the unitary
         totHams[timect] = Htot.matrix
         Ds[timect], Vs[timect] = eigh(Htot.matrix)
-        timeStepUs[timect] = np.dot(Vs[timect], np.exp(-1j*2*pi*timeStep*Ds[timect]).repeat(systemParams.dim).reshape(systemParams.dim, systemParams.dim)*Vs[timect].conj().T)
+        timeStepUs[timect] = np.dot(Vs[timect], np.exp(-1j*2*pi*timeStep*Ds[timect]).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*Vs[timect].conj().T)
         
         totU = np.dot(timeStepUs[timect],totU)
         
@@ -175,31 +177,32 @@ def eval_derivs(optimParams, systemParams, controlHams):
         Uback[-(ct+1)] = np.dot(Usteps[-ct].conj().T, Uback[-ct])
 
     #Now calculate the derivatives
+    #We often use the identity that trace(A^\dagger*B) = np.sum(A.conj()*B) but it doesn't seem to be any faster
     derivs = np.zeros((systemParams.numControlHams, numSteps), dtype=np.float64)
     if optimParams.type == 'unitary':
-        curOverlap = np.trace(np.dot(Uforward[-1].conj().T, optimParams.Ugoal))
+        curOverlap = np.sum(Uforward[-1].conj()*optimParams.Ugoal)
         for timect in range(numSteps):
+            #Put the Hz to rad conversion in the timestep
             tmpTimeStep = 2*pi*optimParams.timeSteps[timect]
             for controlct in range(systemParams.numControlHams):
+                #See Machnes, S., Sander, U., Glaser, S. J., Fouquieres, P., Gruslys, A., Schirmer, S., & Schulte-Herbrueggen, T. (2010). Comparing, Optimising and Benchmarking Quantum Control Algorithms in a  Unifying Programming Framework. arXiv, quant-ph. Retrieved from http://arxiv.org/abs/1011.4874v2
                 if optimParams.derivType == 'exact':
                     #Exact method
-                    #See
                     eigenFrameControlHam = np.dot(Vs[timect].conj().T, np.dot(controlHams[controlct,timect], Vs[timect]))
                     eigenFrameDeriv = np.zeros_like(eigenFrameControlHam)
                     for rowct in range(dim):
                         for colct in range(dim):
-                            diff = Ds[timect][rowct] - Ds[timect][rowct]
-                            if diff < 1e-15:
-                                eigenFrameDeriv[rowct, colct] = -1j*tmpTimeStep*eigenFrameControlHam[rowct,colct]*np.exp(-1j*tmpTimeStep*Ds[timect][colct])
+                            diff = Ds[timect][rowct] - Ds[timect][colct]
+                            if diff < 1e-12:
+                                eigenFrameDeriv[rowct, colct] = -1j*tmpTimeStep*eigenFrameControlHam[rowct,colct]*np.exp(-1j*tmpTimeStep*Ds[timect][rowct])
                             else:
                                 eigenFrameDeriv[rowct, colct] = eigenFrameControlHam[rowct,colct]*((np.exp(-1j*tmpTimeStep*Ds[timect][rowct]) - np.exp(-1j*tmpTimeStep*Ds[timect][colct]))/diff)
                     propFrameDeriv = np.dot(Vs[timect], np.dot(eigenFrameDeriv, Vs[timect].conj().T))
-
                     dUjduk = propFrameDeriv
                     if timect == 0:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.trace(np.dot(Uback[timect].conj().T, dUjduk)) * curOverlap)
+                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*dUjduk) * curOverlap)
                     else:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.trace(np.dot(Uback[timect].conj().T, np.dot(dUjduk, Uforward[timect-1]))) * curOverlap)
+                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*np.dot(dUjduk, Uforward[timect-1])) * curOverlap)
     
                 elif optimParams.derivType == 'approx':
                     #Approximate method
@@ -208,27 +211,32 @@ def eval_derivs(optimParams, systemParams, controlHams):
 
                 elif optimParams.derivType == 'finiteDiff':
                     #Finite difference approach
-                    tmpU1 = expm(-1j*tmpTimeStep*(totHams[timect] + 1e-6*controlHams[controlct,timect]))
-                    tmpU2 = expm(-1j*tmpTimeStep*(totHams[timect] - 1e-6*controlHams[controlct,timect]))
+                    tmpD, tmpV = eigh(totHams[timect] + 1e-6*controlHams[controlct,timect])
+                    tmpU1 = np.dot(tmpV, np.exp(-1j*tmpTimeStep*tmpD).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*tmpV.conj().T)
+                    tmpD, tmpV = eigh(totHams[timect] - 1e-6*controlHams[controlct,timect])
+                    tmpU2 = np.dot(tmpV, np.exp(-1j*tmpTimeStep*tmpD).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*tmpV.conj().T)
                     dUjduk = (tmpU1-tmpU2)/2e-6
                     if timect == 0:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.trace(np.dot(Uback[timect].conj().T, dUjduk)) * curOverlap)
+                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*dUjduk) * curOverlap)
                     else:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.trace(np.dot(Uback[timect].conj().T, np.dot(dUjduk, Uforward[timect-1]))) * curOverlap)
-    
-
+                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*np.dot(dUjduk, Uforward[timect-1])) * curOverlap)
                     
-
+                else:
+                    raise NameError('Unknown derivative type for unitary search.')
+    
     elif optimParams.type == 'state2state':
         rhoSim = np.dot(np.dot(Uforward[-1], optimParams.rhoStart), Uforward[-1].conj().T)
-        tmpMult = np.trace(np.dot(rhoSim, optimParams.rhoGoal))
-        for timect in range(numSteps):
-            rhoj = np.dot(np.dot(Uforward[timect], optimParams.rhoStart), Uforward[timect].conj().T)
-            lambdaj = np.dot(np.dot(Uback[timect], optimParams.rhoGoal), Uback[timect].conj().T)
-            for controlct in range(systemParams.numControlHams):
-                derivs[controlct, timect] = 2*optimParams.timeSteps[timect]*np.imag(np.trace(np.dot(lambdaj.conj().T, 
-                                            np.dot(controlHams[controlct,timect], rhoj) - np.dot(rhoj, controlHams[controlct,timect])))*tmpMult)
-    
+        tmpMult = np.sum(rhoSim.T*optimParams.rhoGoal)
+        if optimParams.derivType == 'approx':
+            for timect in range(numSteps):
+                tmpTimeStep = 2*pi*optimParams.timeSteps[timect]
+                rhoj = np.dot(np.dot(Uforward[timect], optimParams.rhoStart), Uforward[timect].conj().T)
+                lambdaj = np.dot(np.dot(Uback[timect], optimParams.rhoGoal), Uback[timect].conj().T)
+                for controlct in range(systemParams.numControlHams):
+                    derivs[controlct, timect] = 2*tmpTimeStep*np.imag(np.sum(lambdaj.conj()*(np.dot(controlHams[controlct,timect], rhoj) - np.dot(rhoj, controlHams[controlct,timect])))*tmpMult)
+        else:
+            raise NameError('Unknown derivative type for state to state.')
+                    
     return -derivs.flatten()
                     
         
@@ -265,12 +273,29 @@ def optimize_pulse(optimParams, systemParams):
         
     def tmpEvalDerivs(pulseIn):
         optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+        
+        #Code for evaluating goodness of derivatives. 
+#        origGoodness = eval_pulse(optimParams, systemParams, controlHams_int)
+#        if origGoodness < -0.5:
+#            tmpderivs = eval_derivs(optimParams, systemParams, controlHams_int)
+#            finiteDerivs = np.zeros(144)
+#            for timect in range(144):
+#                optimParams.controlAmps[1,timect] += 1e-6
+#                tmpGoodness = eval_pulse(optimParams, systemParams, controlHams_int)
+#                optimParams.controlAmps[1,timect] -= 1e-6
+#                finiteDerivs[timect] = 1e6*(tmpGoodness-origGoodness)
+#            
+#            plt.figure()
+#            plt.plot(tmpderivs[144:],'b')
+#            plt.plot(finiteDerivs,'g--')
+#            plt.show()
+            
         return eval_derivs(optimParams, systemParams, controlHams_int)
     
     #We can use these to take into account power limits and to squeeze the pulse down to zero and the start and finish for finite bandwidth concerns
     #We'll use a Gaussian filter to achieve a ramp up and ramp down on the pulse edges 
     #Setup bounds at the maximum drive frequency
-    timeStep = optimParams.timeSteps[0]
+    timeStep = pulseTime*optimParams.timeSteps[0]
     tmpBounds = np.inf*np.ones_like(curPulse, dtype=np.float64)
     for controlct, tmpControl in enumerate(optimParams.controlLines):
         if tmpControl.bandwidth < np.inf:
@@ -295,11 +320,9 @@ def optimize_pulse(optimParams, systemParams):
     bounds = [(-x, x) for x in tmpBounds.flatten()]
         
     #Call the scipy minimizer
-    #Look at fmin_tnc.func_globals to see how some variables are defined, they are also stored in scipy.optimize.tnc
-    optimResults = fmin_tnc(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, messages=tnc.MSG_ITER, bounds=bounds, fmin=-1, ftol=optimParams.fTol, maxfun=optimParams.maxfun)
+    optimResults = fmin_l_bfgs_b(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, bounds=bounds, iprint=0, maxfun=optimParams.maxfun)
+    
     foundPulse = optimResults[0].reshape((optimParams.numControlLines, optimParams.numTimeSteps))
-    #Print out the search result
-    print(tnc.RCSTRINGS[optimResults[2]])
    
 #    #Rescale time
     optimParams.timeSteps *= pulseTime
