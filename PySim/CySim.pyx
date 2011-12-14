@@ -11,23 +11,45 @@ from libc.stdlib cimport malloc, free
 
 
 cdef extern from "CPPBackEnd.h":
-    void evolution_unitary_CPP(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, complex ** Hcontrols, complex * totU)
+    cdef cppclass PulseSequence:
+        size_t numControlLines
+        size_t numTimeSteps
+        double * timeSteps
+    
+    cdef cppclass ControlHam:
+        complex * inphase
+        complex * quadrature
+    
+    cdef cppclass SystemParams:
+        size_t numControlHams
+        size_t dim
+        vector[ControlHam] controlHams
+        complex * Hnat
 
-def Cy_evolution_unitary(pulseSequence, systemParams):
+    void evolution_unitary_CPP(PulseSequence , SystemParams, complex * totU)
+
+def Cy_evolution_unitary(pulseSeqIn, systemParamsIn):
     
     #Some error checking
-    assert pulseSequence.numControlLines==systemParams.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
+    assert pulseSeqIn.numControlLines==systemParamsIn.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
     
-    #Initialize the total unitary
-    cdef np.ndarray totU = np.eye(systemParams.dim, dtype=np.complex128)
-    cdef np.ndarray timeSteps = pulseSequence.timeSteps
-    cdef np.ndarray Hnat = systemParams.Hnat.matrix
-    cdef complex **Hcontrols
-    Hcontrols = <complex**> malloc(2*pulseSequence.numControlLines*sizeof(complex*))
+    cdef PulseSequence *pulseSeq = new PulseSequence()
+    pulseSeq.numControlLines = pulseSeqIn.numControlLines
+    pulseSeq.numTimeSteps = pulseSeqIn.numTimeSteps
+    pulseSeq.timeSteps = <double *> np.PyArray_DATA(pulseSeqIn.timeSteps)
+
+    cdef SystemParams *systemParams = new SystemParams()    
+    systemParams.Hnat = <complex *> np.PyArray_DATA(systemParamsIn.Hnat.matrix)
+    systemParams.numControlHams = systemParamsIn.numControlHams
+    systemParams.dim = systemParamsIn.dim
     cdef int ct
-    for ct in range(pulseSequence.numControlLines):
-        Hcontrols[2*ct] = <complex*> np.PyArray_DATA(systemParams.controlHams[ct]['inphase'].matrix)
-        Hcontrols[2*ct+1] = <complex*> np.PyArray_DATA(systemParams.controlHams[ct]['quadrature'].matrix)
+    systemParams.controlHams.resize(pulseSeq.numControlLines)
+    for ct in range(pulseSeq.numControlLines):
+        systemParams.controlHams[ct].inphase = <complex*> np.PyArray_DATA(systemParamsIn.controlHams[ct]['inphase'].matrix)
+        systemParams.controlHams[ct].quadrature = <complex*> np.PyArray_DATA(systemParamsIn.controlHams[ct]['quadrature'].matrix)
             
-    evolution_unitary_CPP(pulseSequence.numControlLines, pulseSequence.numTimeSteps, systemParams.dim, <double *> Hnat.data, <double *> timeSteps.data, Hcontrols, <complex *> totU.data    )
+    #Initialize the total unitary output memory to the identity
+    cdef np.ndarray totU = np.eye(systemParamsIn.dim, dtype=np.complex128)
+
+    evolution_unitary_CPP(deref(pulseSeq), deref(systemParams), <complex *> totU.data    )
     return totU

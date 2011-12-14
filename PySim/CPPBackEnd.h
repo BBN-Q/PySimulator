@@ -31,10 +31,32 @@ using std::endl;
 typedef std::complex<double> cdouble;
 typedef Map<MatrixXcd> Mapcd;
 
+class ControlHam
+{
+public:
+	cdouble * inphase;
+	cdouble * quadrature;
+};
+
+//Some classes/structures to nicely store the data
+class PulseSequence{
+public:
+	size_t numControlLines;
+	size_t numTimeSteps;
+	double * timeSteps;
+};
+
+class SystemParams{
+public:
+	size_t numControlHams;
+	size_t dim;
+	std::vector<ControlHam> controlHams;
+	cdouble * Hnat;
+};
 
 //Forward declarations of the functions
+void evolution_unitary_CPP(const PulseSequence &, const SystemParams &, cdouble *);
 
-void evolution_unitary_CPP(int numControlLines, int numTimeSteps, int dim, double * Hnat, double * timeSteps, cdouble ** Hcontrols, cdouble * totU);
 
 
 #endif /* CPPBACKEND_H__ */
