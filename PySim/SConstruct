@@ -1,9 +1,10 @@
-#We need distutils to get the location of the python headers and numpy to get the numpy headers
+#We need distutils to get the location of the python headers and numpy to get the numpy headers and os to get the PATH
 import distutils.sysconfig
 import numpy
+import os
 
-#Setup the initial environment with the path from the distutils to the python header files
-env = Environment(CPPPATH=[distutils.sysconfig.get_python_inc()])
+#Setup the initial environment with the path from the distutils to the python header files and the PATH
+env = Environment(CPPPATH=[distutils.sysconfig.get_python_inc()], ENV = {'PATH' : os.environ['PATH']})
 
 #Create a command line builder for the cython build step as it is not built into scons
 CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus -o $TARGET $SOURCE')
