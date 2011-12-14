@@ -70,20 +70,23 @@ class Test(unittest.TestCase):
         systemParams.measurement = Q1.levelProjector(1)
         
         #Setup the pulse parameters for the optimization
+        numPoints = 30
+        pulseTime = 15e-9
         pulseParams = PulseParams()
-        pulseParams.timeSteps = 0.5e-9*np.ones(30)
+        pulseParams.timeSteps = (pulseTime/numPoints)*np.ones(numPoints)
         pulseParams.rhoStart = Q1.levelProjector(0)
         pulseParams.rhoGoal = Q1.levelProjector(1)
         pulseParams.Ugoal = Q1.pauliX
         pulseParams.add_control_line(freq=-Q1.omega, bandwidth=300e6, maxAmp=200e6)
         pulseParams.add_control_line(freq=-Q1.omega, initialPhase=-np.pi/2, bandwidth=300e6, maxAmp=200e6)
-        pulseParams.H_int = Hamiltonian(Q1.omega*np.diag(np.arange(Q1.dim)))
+        pulseParams.H_int = Hamiltonian((Q1.omega)*np.diag(np.arange(Q1.dim)))
         pulseParams.type = 'unitary'
+        pulseParams.derivType = 'finiteDiff'
         
         #Start with a Gaussian
-        tmpGauss = np.exp(-np.linspace(-2,2,30)**2)
+        tmpGauss = np.exp(-np.linspace(-2,2,numPoints)**2)
         tmpScale = 0.5/(np.sum(pulseParams.timeSteps*tmpGauss))
-        pulseParams.startControlAmps = np.vstack((tmpScale*tmpGauss, np.zeros(30)))
+        pulseParams.startControlAmps = np.vstack((tmpScale*tmpGauss, np.zeros(numPoints)))
         
         #Call the optimization    
         optimize_pulse(pulseParams, systemParams)
