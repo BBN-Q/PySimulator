@@ -74,8 +74,7 @@ public:
 #include "HelperFunctions.h"
 
 //Forward declarations of the functions
-void evolution_unitary_CPP(const PulseSequence &, const SystemParams &, cdouble *);
-void evolution_lindblad_CPP(const PulseSequence &, const SystemParams &, cdouble *);
+void evolve_propagator_CPP(const PulseSequence &, const SystemParams &, const int &,  cdouble *);
 
 
 

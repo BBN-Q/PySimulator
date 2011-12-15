@@ -32,11 +32,8 @@ cdef extern from "CPPBackEnd.h":
         complex * HnatPtr
         vector[complex *] dissipatorPtrs
 
-    void evolution_unitary_CPP(PulseSequence , SystemParams, complex * )
+    void evolve_propagator_CPP(PulseSequence , SystemParams, int, complex * )
     
-    void evolution_lindblad_CPP(PulseSequence , SystemParams, complex * )
-    
-
 def Cy_evolution(pulseSeqIn, systemParamsIn, simType):
     
     #Some error checking
@@ -78,9 +75,9 @@ def Cy_evolution(pulseSeqIn, systemParamsIn, simType):
     cdef np.ndarray totProp
     if simType == 'unitary':
         totProp = np.eye(systemParamsIn.dim, dtype=np.complex128)
-        evolution_unitary_CPP(deref(pulseSeq), deref(systemParams), <complex *> totProp.data )
+        evolve_propagator_CPP(deref(pulseSeq), deref(systemParams), 0, <complex *> totProp.data )
     elif simType == 'lindblad':
         totProp = np.eye(systemParamsIn.dim**2, dtype=np.complex128)
-        evolution_lindblad_CPP(deref(pulseSeq), deref(systemParams), <complex *> totProp.data )
+        evolve_propagator_CPP(deref(pulseSeq), deref(systemParams), 1, <complex *> totProp.data )
         
     return totProp
