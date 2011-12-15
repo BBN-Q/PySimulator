@@ -2,9 +2,17 @@
 import distutils.sysconfig
 import numpy
 import os
+import platform
 
 #Setup the initial environment with the path from the distutils to the python header files and the PATH
 env = Environment(CPPPATH=[distutils.sysconfig.get_python_inc()], ENV = {'PATH' : os.environ['PATH']})
+
+ccvars = distutils.sysconfig.get_config_var('CXXFLAGS')
+print ccvars
+
+# set system specific linking params
+ldvars = distutils.sysconfig.get_config_var('LDCXXSHARED').split()[1:]
+env.Replace(SHLINKFLAGS=ldvars)
 
 #Create a command line builder for the cython build step as it is not built into scons
 CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus -o $TARGET $SOURCE')
@@ -21,11 +29,15 @@ debugFlag = int(ARGUMENTS.get('debug', 0))
 if debugFlag:
     env.Append(CPPFLAGS=['-g'])
 else:
-    env.Append(CPPFLAGS=['-O3'])
+    if platform.system() == 'Darwin':
+        # warning: march=native doesn't work on GCC 4.2 that comes with OS 10.7
+        env.Append(CPPFLAGS=['-fast', '-ftree-vectorize', '-march=core2'])
+    else:
+        env.Append(CPPFLAGS=['-O3', '-ffast-math', '-ftree-vectorize', '-march=native'])
     env.Append(CPPDEFINES=['NDEBUG'])
     
 #For python modules we don't need the lib prefix
-env.Replace(SHLIBPREFIX='')
+env.Replace(SHLIBPREFIX='', SHLIBSUFFIX='.so')
 #Define the shared library target for building 
 CyModule = env.SharedLibrary(target='CySim', source=['CPPBackEnd.cpp', CyBuilder])
 
