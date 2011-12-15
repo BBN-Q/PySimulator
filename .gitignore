@@ -1,3 +1,7 @@
 *.pyc
 .project
 .pydevproject
+PySim/CySim.cpp
+*.os
+*.so
+*.dll
