@@ -2,6 +2,7 @@
 .project
 .pydevproject
 PySim/CySim.cpp
+PySim/.sconsign.dblite
 *.os
 *.so
 *.dll
