@@ -30,10 +30,14 @@ cdef extern from "CPPBackEnd.h":
         size_t dim
         vector[ControlHam] controlHams
         complex * HnatPtr
+        vector[complex *] dissipatorPtrs
 
-    void evolution_unitary_CPP(PulseSequence , SystemParams, complex * totU)
+    void evolution_unitary_CPP(PulseSequence , SystemParams, complex * )
+    
+    void evolution_lindblad_CPP(PulseSequence , SystemParams, complex * )
+    
 
-def Cy_evolution_unitary(pulseSeqIn, systemParamsIn):
+def Cy_evolution(pulseSeqIn, systemParamsIn, simType):
     
     #Some error checking
     assert pulseSeqIn.numControlLines==systemParamsIn.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
@@ -55,6 +59,7 @@ def Cy_evolution_unitary(pulseSeqIn, systemParamsIn):
         else:
             pulseSeq.controlLines[ct].controlType = 0
     pulseSeq.H_intPtr = <complex *> np.PyArray_DATA(pulseSeqIn.H_int.matrix) if pulseSeqIn.H_int is not None else NULL
+    
             
 
     cdef SystemParams *systemParams = new SystemParams()    
@@ -65,9 +70,17 @@ def Cy_evolution_unitary(pulseSeqIn, systemParamsIn):
     for ct in range(pulseSeq.numControlLines):
         systemParams.controlHams[ct].inphasePtr = <complex*> np.PyArray_DATA(systemParamsIn.controlHams[ct]['inphase'].matrix)
         systemParams.controlHams[ct].quadraturePtr = <complex*> np.PyArray_DATA(systemParamsIn.controlHams[ct]['quadrature'].matrix) if systemParamsIn.controlHams[ct]['quadrature'] is not None else NULL
+    systemParams.dissipatorPtrs.resize(len(systemParamsIn.dissipators))
+    for ct in range(len(systemParamsIn.dissipators)):
+        systemParams.dissipatorPtrs[ct] = <complex*> np.PyArray_DATA(systemParamsIn.dissipators[ct].matrix)
             
     #Initialize the total unitary output memory to the identity
-    cdef np.ndarray totU = np.eye(systemParamsIn.dim, dtype=np.complex128)
-
-    evolution_unitary_CPP(deref(pulseSeq), deref(systemParams), <complex *> totU.data    )
-    return totU
+    cdef np.ndarray totProp
+    if simType == 'unitary':
+        totProp = np.eye(systemParamsIn.dim, dtype=np.complex128)
+        evolution_unitary_CPP(deref(pulseSeq), deref(systemParams), <complex *> totProp.data )
+    elif simType == 'lindblad':
+        totProp = np.eye(systemParamsIn.dim**2, dtype=np.complex128)
+        evolution_lindblad_CPP(deref(pulseSeq), deref(systemParams), <complex *> totProp.data )
+        
+    return totProp

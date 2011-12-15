@@ -93,8 +93,7 @@ if __name__ == '__main__':
         
             pulseSeqs.append(tmpPulseSeq)
     
-    result = simulate_sequence(pulseSeqs[-1], systemParams, rhoIn, simType='unitary')[0]
-    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')[0]
+    results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='lindblad')[0]
     results.resize((freqSweep.size, ampSweep.size))
 #    plt.plot(freqSweep,results)
 #    plt.show()
@@ -103,6 +102,6 @@ if __name__ == '__main__':
 ##    plt.xlabel('Frequency')
 ##    plt.ylabel('Measurement Voltage')
 ##    plt.title('Two Qubit Bell-Rabi Spectroscopy')
-    plt.imshow(results, extent = [-1, 1, freqSweep[-1], freqSweep[0]], aspect='auto')
-    plt.show()
+#    plt.imshow(results, extent = [-1, 1, freqSweep[-1], freqSweep[0]], aspect='auto')
+#    plt.show()
 

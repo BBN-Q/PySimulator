@@ -41,7 +41,7 @@ def evolution_unitary(pulseSequence, systemParams):
     assert pulseSequence.numControlLines==systemParams.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
     
     if CPPBackEnd:
-        return PySim.CySim.Cy_evolution_unitary(pulseSequence, systemParams)
+        return PySim.CySim.Cy_evolution(pulseSequence, systemParams, 'unitary')
     else:
     
         totU = np.eye(systemParams.dim)
@@ -97,53 +97,58 @@ def evolution_lindblad(pulseSequence, systemParams, rhoIn):
     #Some error checking
     assert pulseSequence.numControlLines==systemParams.numControlHams, 'Oops! We need the same number of control Hamiltonians as control lines.'
     
-    #Setup the super operators for the dissipators
-    supDis = np.zeros((systemParams.dim**2, systemParams.dim**2), dtype=np.complex128)
-    for tmpDis in systemParams.dissipators:
-        supDis += tmpDis.superOpColStack()
-        
-    #Initialize the propagator
-    totF = np.eye(systemParams.dim**2)
-    
-    #Loop over each timestep in the sequence
-    curTime = 0.0
-    for timect, timeStep in enumerate(pulseSequence.timeSteps):
-        tmpTime = 0.0 
-        #Loop over the sub-pixels if we have a finer discretization
-        while tmpTime < timeStep:
-            #Choose the minimum of the time left or the sub pixel timestep
-            subTimeStep = np.minimum(timeStep-tmpTime, pulseSequence.maxTimeStep)
+    if CPPBackEnd:
+        return PySim.CySim.Cy_evolution(pulseSequence, systemParams, 'lindblad')
+    else:
 
-            #Initialize the Hamiltonian to the drift Hamiltonian
-            Htot = deepcopy(systemParams.Hnat)
+    
+        #Setup the super operators for the dissipators
+        supDis = np.zeros((systemParams.dim**2, systemParams.dim**2), dtype=np.complex128)
+        for tmpDis in systemParams.dissipators:
+            supDis += tmpDis.superOpColStack()
             
-            #Add each of the control Hamiltonians
-            for controlct, tmpControl in enumerate(pulseSequence.controlLines):
-                tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.phase
-                if tmpControl.controlType == 'rotating':
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix
-                elif tmpControl.controlType == 'sinusoidal':
-                    tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix
+        #Initialize the propagator
+        totF = np.eye(systemParams.dim**2)
+        
+        #Loop over each timestep in the sequence
+        curTime = 0.0
+        for timect, timeStep in enumerate(pulseSequence.timeSteps):
+            tmpTime = 0.0 
+            #Loop over the sub-pixels if we have a finer discretization
+            while tmpTime < timeStep:
+                #Choose the minimum of the time left or the sub pixel timestep
+                subTimeStep = np.minimum(timeStep-tmpTime, pulseSequence.maxTimeStep)
+    
+                #Initialize the Hamiltonian to the drift Hamiltonian
+                Htot = deepcopy(systemParams.Hnat)
+                
+                #Add each of the control Hamiltonians
+                for controlct, tmpControl in enumerate(pulseSequence.controlLines):
+                    tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.phase
+                    if tmpControl.controlType == 'rotating':
+                        tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix
+                    elif tmpControl.controlType == 'sinusoidal':
+                        tmpMat = cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix
+                    else:
+                        raise TypeError('Unknown control type.')
+                    tmpMat *= pulseSequence.controlAmps[controlct,timect]
+                    Htot += tmpMat
+                   
+                if pulseSequence.H_int is not None:
+                    #Move the total Hamiltonian into the interaction frame
+                    Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
+                    supHtot = Htot.superOpColStack(interactionMatrix=True)
                 else:
-                    raise TypeError('Unknown control type.')
-                tmpMat *= pulseSequence.controlAmps[controlct,timect]
-                Htot += tmpMat
-               
-            if pulseSequence.H_int is not None:
-                #Move the total Hamiltonian into the interaction frame
-                Htot.calc_interaction_frame(pulseSequence.H_int, curTime)
-                supHtot = Htot.superOpColStack(interactionMatrix=True)
-            else:
-                supHtot = Htot.superOpColStack()
-            
-            
-            #Propagate the unitary
-            totF = np.dot(expm(subTimeStep*(1j*2*pi*supHtot + supDis)),totF)
-            
-            tmpTime += subTimeStep
-            curTime += subTimeStep
-            
-    return totF
+                    supHtot = Htot.superOpColStack()
+                
+                
+                #Propagate the unitary
+                totF = np.dot(expm(subTimeStep*(1j*2*pi*supHtot + supDis)),totF)
+                
+                tmpTime += subTimeStep
+                curTime += subTimeStep
+                
+        return totF
 
     
     
