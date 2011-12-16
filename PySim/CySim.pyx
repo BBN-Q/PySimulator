@@ -57,8 +57,6 @@ def Cy_evolution(pulseSeqIn, systemParamsIn, simType):
             pulseSeq.controlLines[ct].controlType = 0
     pulseSeq.H_intPtr = <complex *> np.PyArray_DATA(pulseSeqIn.H_int.matrix) if pulseSeqIn.H_int is not None else NULL
     
-            
-
     cdef SystemParams *systemParams = new SystemParams()    
     systemParams.HnatPtr = <complex *> np.PyArray_DATA(systemParamsIn.Hnat.matrix)
     systemParams.numControlHams = systemParamsIn.numControlHams
@@ -79,5 +77,9 @@ def Cy_evolution(pulseSeqIn, systemParamsIn, simType):
     elif simType == 'lindblad':
         totProp = np.eye(systemParamsIn.dim**2, dtype=np.complex128)
         evolve_propagator_CPP(deref(pulseSeq), deref(systemParams), 1, <complex *> totProp.data )
-        
+    
+    #Release the memory allocated by new    
+    del pulseSeq
+    del systemParams
+    
     return totProp
