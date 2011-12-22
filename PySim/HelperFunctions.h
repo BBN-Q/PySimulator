@@ -10,16 +10,14 @@ inline MatrixXcd move2interaction_frame(const MatrixXcd & Hint, const double & c
 
 //Helper function to calculate the matrix exponential of a symmetric (Hermitian) matrix multiplied by a constant
 //through the eigenvalue decomposition
-template <typename MatrixType, typename T>
-inline MatrixType expm_eigen(const MatrixType & matIn, const T & mult){
+inline MatrixXcd expm_eigen(const MatrixXcd & matIn, const cdouble & mult){
 	size_t dim = matIn.rows();
-	SelfAdjointEigenSolver<MatrixType> es(matIn);
+	SelfAdjointEigenSolver<MatrixXcd> es(matIn);
 	MatrixXd D = es.eigenvalues();
-	MatrixType V = es.eigenvectors();
-//	return V*((mult*D).array().exp().matrix().replicate(1,dim).cwiseProduct(V.adjoint()));
-	return V*(mult*D).array().exp().matrix().asDiagonal()*V.adjoint();
+	MatrixXcd V = es.eigenvectors();
+	return V*((mult*D).array().exp().matrix().replicate(1,dim).cwiseProduct(V.adjoint()));
+//	return V*(mult*D).array().exp().matrix().asDiagonal()*V.adjoint();
 }
-
 
 //Helper function to do the kronecker product.  There is one built into Eigen but you have to pass it answer space and I'd rather take the temporary hit
 // and assume we are working with complex matrices
