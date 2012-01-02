@@ -24,6 +24,13 @@ from QuantumSystems import Hamiltonian
 
 from Evolution import expm_eigen
 
+#Try to load the CPPBackEnd
+try:
+    import PySim.CySim
+    CPPBackEnd = True
+except ImportError:
+    CPPBackEnd = False
+
 class PulseParams(PulseSequence):
     '''
     For now just a container for pulse optimization parameters.  Subclasses a PulseSequence as it has to define similar things.
@@ -42,7 +49,7 @@ def create_random_pulse(numChannels, numPoints):
     Helper function to create smooth pulse starting point.
     '''
     #TODO: return something besides ones
-    return 1e6*np.ones((numChannels, numPoints))
+    return 2e6*np.ones((numChannels, numPoints))
 
 
 def calc_control_Hams(optimParams, systemParams):
@@ -58,7 +65,7 @@ def calc_control_Hams(optimParams, systemParams):
         
         #Loop over each of the control Hamiltonians
         for controlct, tmpControl in enumerate(optimParams.controlLines):
-            tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.initialPhase
+            tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.phase
             if tmpControl.controlType == 'rotating':
                 tmpHam = Hamiltonian(cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix)
             elif tmpControl.controlType == 'sinusoidal':
@@ -251,7 +258,7 @@ def optimize_pulse(optimParams, systemParams):
         
     #Figure out the dimension (squared) of the computational space from the desired unitary
     #We use this for normalizing the results
-    optimParams.dimC2 = np.abs(np.trace(np.dot(optimParams.Ugoal.conj().T, optimParams.Ugoal)))**2 if optimParams.type == 'unitary' else None
+    optimParams.dimC2 = np.abs(np.trace(np.dot(optimParams.Ugoal.conj().T, optimParams.Ugoal)))**2 if optimParams.type == 'unitary' else 0
     
     #Calculate the interaction frame Hamiltonians
     controlHams_int = calc_control_Hams(optimParams, systemParams)
@@ -264,13 +271,32 @@ def optimize_pulse(optimParams, systemParams):
         optimParams.H_int.matrix *= pulseTime
     curPulse *= pulseTime
     
-    #Create some helper functions for the goodness and derivative evaluation
-    def tmpEvalPulse(pulseIn):
-        optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
-        return eval_pulse(optimParams, systemParams, controlHams_int)
+    '''
+    Create some helper functions for the goodness and derivative evaluation
+    If we are using the C++ backend then we define some C classes to store C pointers to the data and control Hamiltonians and temporary propagator results
+    which we can then pass to the evaluator functions.
+    '''
+    if CPPBackEnd:
+        controlHams_int_CPP = PySim.CySim.PyControlHams_int(controlHams_int)
+        optimParams_CPP = PySim.CySim.PyOptimParams(optimParams)
+        systemParams_CPP = PySim.CySim.PySystemParams(systemParams)
+        propResults_CPP = PySim.CySim.PyPropResults(optimParams.numTimeSteps, systemParams.dim)
         
-    def tmpEvalDerivs(pulseIn):
-        optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+        def tmpEvalPulse(pulseIn):
+            optimParams_CPP.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+            return PySim.CySim.Cy_eval_pulse(optimParams_CPP, systemParams_CPP, controlHams_int_CPP, propResults_CPP)
+        
+        def tmpEvalDerivs(pulseIn):
+            optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+            return PySim.CySim.Cy_eval_derivs(optimParams_CPP, systemParams_CPP, controlHams_int_CPP, propResults_CPP)
+    else:
+    
+        def tmpEvalPulse(pulseIn):
+            optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+            return eval_pulse(optimParams, systemParams, controlHams_int)
+            
+        def tmpEvalDerivs(pulseIn):
+            optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
         
         #Code for evaluating goodness of derivatives. 
 #        origGoodness = eval_pulse(optimParams, systemParams, controlHams_int)
@@ -288,7 +314,7 @@ def optimize_pulse(optimParams, systemParams):
 #            plt.plot(finiteDerivs,'g--')
 #            plt.show()
             
-        return eval_derivs(optimParams, systemParams, controlHams_int)
+            return eval_derivs(optimParams, systemParams, controlHams_int)
     
     #We can use these to take into account power limits and to squeeze the pulse down to zero and the start and finish for finite bandwidth concerns
     #We'll use a Gaussian filter to achieve a ramp up and ramp down on the pulse edges 
@@ -320,6 +346,7 @@ def optimize_pulse(optimParams, systemParams):
     #Call the scipy minimizer
     optimResults = fmin_l_bfgs_b(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, bounds=bounds, iprint=0, maxfun=optimParams.maxfun)
     
+    #Reshape the optimized pulse from a 1D vector
     foundPulse = optimResults[0].reshape((optimParams.numControlLines, optimParams.numTimeSteps))
    
 #    #Rescale time

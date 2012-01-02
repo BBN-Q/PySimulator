@@ -49,3 +49,4 @@ inline MatrixXcd superOp_colStack_hamiltonian(const MatrixXcd & HamIn){
 	MatrixXcd tmpEye = MatrixXcd::Identity(dim, dim);
 	return kron(HamIn.conjugate(), tmpEye) - kron(tmpEye, HamIn);
 }
+

@@ -16,6 +16,13 @@ public:
 	ControlHamMap() : inphase(NULL,0,0), quadrature(NULL,0,0) {};
 };
 
+
+//Helper function to calculate the fitness of a simulated unitary
+double eval_unitary_fitness(const OptimParams & optimParams, const PropResults & propResults){
+	double tmpResult = abs(optimParams.Ugoal.conjugate().cwiseProduct(propResults.totU).sum());
+	return -(tmpResult*tmpResult)/optimParams.dimC2;
+}
+
 void evolve_propagator_CPP(const PulseSequence & pulseSeq, const SystemParams & systemParams, const int & simType, cdouble * totPropPtr){
 	/*
 	 * Propagate evolution through a pulse sequence.
@@ -126,7 +133,6 @@ void evolve_propagator_CPP(const PulseSequence & pulseSeq, const SystemParams & 
 
 //Helper function to evolve the unitary propagator for optimal control.
 //This stores all intermediate results in propResults structure
-
 void opt_evolve_propagator_CPP(const OptimParams & optimParams, const SystemParams & systemParams, cdouble *** controlHams_int, PropResults & propResults){
 
 	size_t dim = systemParams.dim;
@@ -166,14 +172,13 @@ void opt_evolve_propagator_CPP(const OptimParams & optimParams, const SystemPara
 		SelfAdjointEigenSolver<MatrixXcd> es(Htot);
    		propResults.Ds[timect] = es.eigenvalues();
    		propResults.Vs[timect] = es.eigenvectors();
-    	propResults.Us[timect] = propResults.Vs[timect]*((-i*TWOPI*timeSteps[timect]*propResults.Ds[timect]).array().exp().matrix().replicate(1,dim).cwiseProduct(propResults.Vs[timect].adjoint()));
-    	propResults.Uforward[timect+1] = propResults.Us[timect]*propResults.Uforward[timect-1];
+   		propResults.Us[timect] = propResults.Vs[timect]*((-i*TWOPI*timeSteps[timect]*propResults.Ds[timect]).array().exp().matrix().replicate(1,dim).cwiseProduct(propResults.Vs[timect].adjoint()));
+   		propResults.Uforward[timect+1] = propResults.Us[timect]*propResults.Uforward[timect];
     }
     propResults.totU = propResults.Uforward[optimParams.numTimeSteps];
 }
 
 void eval_derivs(const OptimParams & optimParams, const SystemParams & systemParams, cdouble *** controlHams_int, PropResults & propResults, double * derivsPtr){
-
 	size_t dim = systemParams.dim;
 
 	//Map the timesteps vector
@@ -185,14 +190,13 @@ void eval_derivs(const OptimParams & optimParams, const SystemParams & systemPar
 	//Calculate the backward evolution
 	//TODO: state2state
 	propResults.Uback[optimParams.numTimeSteps-1] = optimParams.Ugoal;
-	for(size_t timect=optimParams.numTimeSteps-2; timect >= 0; --timect){
+	for(int timect=optimParams.numTimeSteps-2; timect >= 0; --timect){
 		propResults.Uback[timect] = propResults.Us[timect+1].adjoint()*propResults.Uback[timect+1];
 	}
 
 	//Now calculate the derivatives
     //We often use the identity that trace(np.dot(A^\dagger,B)) = np.sum(A.conj()*B)
 	Map<MatrixXd> derivsMat(derivsPtr, optimParams.numControlLines, optimParams.numTimeSteps);
-
 	//Current trace overlap
 	cdouble curOverlap = (propResults.totU.conjugate().cwiseProduct(optimParams.Ugoal)).sum();
 	for (size_t timect = 0; timect < optimParams.numTimeSteps; ++timect) {
@@ -207,71 +211,4 @@ void eval_derivs(const OptimParams & optimParams, const SystemParams & systemPar
 		}
 	}
 }
-
-/*
-
-
-
-    #Now calculate the derivatives
-    #We often use the identity that trace(A^\dagger*B) = np.sum(A.conj()*B) but it doesn't seem to be any faster
-    derivs = np.zeros((systemParams.numControlHams, numSteps), dtype=np.float64)
-    if optimParams.type == 'unitary':
-        curOverlap = np.sum(Uforward[-1].conj()*optimParams.Ugoal)
-        for timect in range(numSteps):
-            #Put the Hz to rad conversion in the timestep
-            tmpTimeStep = 2*pi*optimParams.timeSteps[timect]
-            for controlct in range(systemParams.numControlHams):
-                #See Machnes, S., Sander, U., Glaser, S. J., Fouquieres, P., Gruslys, A., Schirmer, S., & Schulte-Herbrueggen, T. (2010). Comparing, Optimising and Benchmarking Quantum Control Algorithms in a  Unifying Programming Framework. arXiv, quant-ph. Retrieved from http://arxiv.org/abs/1011.4874v2
-                if optimParams.derivType == 'exact':
-                    #Exact method
-                    eigenFrameControlHam = np.dot(Vs[timect].conj().T, np.dot(controlHams[controlct,timect], Vs[timect]))
-                    eigenFrameDeriv = np.zeros_like(eigenFrameControlHam)
-                    for rowct in range(dim):
-                        for colct in range(dim):
-                            diff = Ds[timect][rowct] - Ds[timect][colct]
-                            if diff < 1e-12:
-                                eigenFrameDeriv[rowct, colct] = -1j*tmpTimeStep*eigenFrameControlHam[rowct,colct]*np.exp(-1j*tmpTimeStep*Ds[timect][rowct])
-                            else:
-                                eigenFrameDeriv[rowct, colct] = eigenFrameControlHam[rowct,colct]*((np.exp(-1j*tmpTimeStep*Ds[timect][rowct]) - np.exp(-1j*tmpTimeStep*Ds[timect][colct]))/diff)
-                    propFrameDeriv = np.dot(Vs[timect], np.dot(eigenFrameDeriv, Vs[timect].conj().T))
-                    dUjduk = propFrameDeriv
-                    if timect == 0:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*dUjduk) * curOverlap)
-                    else:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*np.dot(dUjduk, Uforward[timect-1])) * curOverlap)
-
-                elif optimParams.derivType == 'approx':
-                    #Approximate method
-                    derivs[controlct, timect] = (2/optimParams.dimC2)*tmpTimeStep*np.imag(np.trace(np.dot(Uback[timect].conj().T, \
-                            np.dot(controlHams[controlct,timect], Uforward[timect]))) * curOverlap)
-
-                elif optimParams.derivType == 'finiteDiff':
-                    #Finite difference approach
-                    tmpU1 = expm_eigen(totHams[timect] + 1e-6*controlHams[controlct,timect], -1j*tmpTimeStep)[0]
-                    tmpU2 = expm_eigen(totHams[timect] - 1e-6*controlHams[controlct,timect], -1j*tmpTimeStep)[0]
-                    dUjduk = (tmpU1-tmpU2)/2e-6
-                    if timect == 0:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*dUjduk) * curOverlap)
-                    else:
-                        derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*np.dot(dUjduk, Uforward[timect-1])) * curOverlap)
-
-                else:
-                    raise NameError('Unknown derivative type for unitary search.')
-
-    elif optimParams.type == 'state2state':
-        rhoSim = np.dot(np.dot(Uforward[-1], optimParams.rhoStart), Uforward[-1].conj().T)
-        tmpMult = np.sum(rhoSim.T*optimParams.rhoGoal)
-        if optimParams.derivType == 'approx':
-            for timect in range(numSteps):
-                tmpTimeStep = 2*pi*optimParams.timeSteps[timect]
-                rhoj = np.dot(np.dot(Uforward[timect], optimParams.rhoStart), Uforward[timect].conj().T)
-                lambdaj = np.dot(np.dot(Uback[timect], optimParams.rhoGoal), Uback[timect].conj().T)
-                for controlct in range(systemParams.numControlHams):
-                    derivs[controlct, timect] = 2*tmpTimeStep*np.imag(np.sum(lambdaj.conj()*(np.dot(controlHams[controlct,timect], rhoj) - np.dot(rhoj, controlHams[controlct,timect])))*tmpMult)
-        else:
-            raise NameError('Unknown derivative type for state to state.')
-
-    return -derivs.flatten()
-
-    */
 
