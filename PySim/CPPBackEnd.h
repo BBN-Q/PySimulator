@@ -75,6 +75,7 @@ class OptimParams : public PulseSequence {
 public:
 	Mapcd Ugoal;
 	size_t dimC2;
+	int derivType;
 
 	OptimParams(cdouble * UgoalPtr, size_t dim, size_t dimC2In) : Ugoal(UgoalPtr, dim, dim), dimC2(dimC2In) {};
 

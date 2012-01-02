@@ -36,6 +36,7 @@ cdef extern from "CPPBackEnd.h":
     cdef cppclass OptimParams(PulseSequence):
         OptimParams(complex *, size_t, size_t)
         size_t dimC2
+        int derivType
         
     cdef cppclass PropResults:
         PropResults(size_t, size_t)
@@ -136,6 +137,8 @@ cdef class PyOptimParams(object):
             self.thisPtr.controlLines[ct].phase = optimParamsIn.controlLines[ct].phase
         self.thisPtr.controlLines[ct].controlType = 1 if optimParamsIn.controlLines[ct].controlType=='rotating' else 0
         self.thisPtr.H_intPtr = <complex *> np.PyArray_DATA(optimParamsIn.H_int.matrix) if optimParamsIn.H_int is not None else NULL
+        derivTypeMap = {'finiteDiff':0, 'approx':1, 'exact':2}
+        self.thisPtr.derivType = derivTypeMap[optimParamsIn.derivType]
 
     def __dealloc__(self):
         del self.thisPtr   

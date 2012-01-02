@@ -203,11 +203,46 @@ void eval_derivs(const OptimParams & optimParams, const SystemParams & systemPar
 		//Put the Hz to rad conversion in the timestep
         double tmpTimeStep = TWOPI*timeSteps(timect);
 		for (size_t controlct = 0; controlct < optimParams.numControlLines; ++controlct) {
-			//Finite difference approach
-			MatrixXcd tmpU1 = expm_eigen(propResults.totHams[timect] + 1e-6*Map<MatrixXcd>(controlHams_int[controlct][timect],dim,dim), -1j*tmpTimeStep);
-			MatrixXcd tmpU2 = expm_eigen(propResults.totHams[timect] - 1e-6*Map<MatrixXcd>(controlHams_int[controlct][timect],dim,dim), -1j*tmpTimeStep);
-            MatrixXcd dUjdUk = (tmpU1-tmpU2)/2e-6;
-            derivsMat(controlct, timect) = (2.0/optimParams.dimC2)*(propResults.Uback[timect].conjugate().cwiseProduct(dUjdUk*propResults.Uforward[timect]).sum()*curOverlap).real();
+			MatrixXcd dUjdUk;
+			switch (optimParams.derivType) {
+				//Finite difference approach
+				case 0:{
+					MatrixXcd tmpU1 = expm_eigen(propResults.totHams[timect] + 1e-6*Map<MatrixXcd>(controlHams_int[controlct][timect],dim,dim), -1j*tmpTimeStep);
+					MatrixXcd tmpU2 = expm_eigen(propResults.totHams[timect] - 1e-6*Map<MatrixXcd>(controlHams_int[controlct][timect],dim,dim), -1j*tmpTimeStep);
+					dUjdUk = (tmpU1-tmpU2)/2e-6;
+				}break;
+				//Approximate gradients
+				case 1:
+					dUjdUk = -i*tmpTimeStep*Map<MatrixXcd>(controlHams_int[controlct][timect],dim,dim)*propResults.Us[timect];
+					break;
+
+				//Exact gradients
+				case 2:
+					//Move the control Hamiltonian into the eigenbasis
+					MatrixXcd eigenFrameControlHam = propResults.Vs[timect].adjoint()*Map<MatrixXcd>(controlHams_int[controlct][timect],dim,dim)*propResults.Vs[timect];
+					//Initialize the derivative of the unitary step in the eigenbasis
+					MatrixXcd eigenFrameDeriv = MatrixXcd::Zero(dim,dim);
+					for (size_t rowct = 0; rowct < dim; ++rowct) {
+						for (size_t colct = 0; colct < dim; ++colct) {
+							//Calculate the difference in eigenvalues
+							double diff = propResults.Ds[timect](rowct) - propResults.Ds[timect](colct);
+							//If it is close to zero
+							if (diff < 1e-12) {
+								//For some bizarre reason I have to cast everything
+								eigenFrameDeriv(rowct,colct) = static_cast<cdouble>(-1i*tmpTimeStep)*static_cast<cdouble>(eigenFrameControlHam(rowct,colct))*exp(-i*tmpTimeStep*propResults.Ds[timect](rowct));
+							}
+							else{
+								eigenFrameDeriv(rowct,colct) = eigenFrameControlHam(rowct,colct)*(exp(-i*tmpTimeStep*propResults.Ds[timect](rowct)) - exp(-i*tmpTimeStep*propResults.Ds[timect](colct)))/diff;
+							}
+						}
+					}
+					//Convert back to the standard basis
+					dUjdUk = propResults.Vs[timect]*eigenFrameDeriv*propResults.Vs[timect].adjoint();
+					break;
+			}
+
+			derivsMat(controlct, timect) = (2.0/optimParams.dimC2)*(propResults.Uback[timect].conjugate().cwiseProduct(dUjdUk*propResults.Uforward[timect]).sum()*curOverlap).real();
+
 		}
 	}
 }
