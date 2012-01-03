@@ -8,7 +8,6 @@ import platform
 env = Environment(CPPPATH=[distutils.sysconfig.get_python_inc()], ENV = {'PATH' : os.environ['PATH']})
 
 ccvars = distutils.sysconfig.get_config_var('CXXFLAGS')
-print ccvars
 
 # set system specific linking params
 ldvars = distutils.sysconfig.get_config_var('LDCXXSHARED').split()[1:]
@@ -35,7 +34,7 @@ else:
         env.Append(CPPFLAGS=['-O3', '-ffast-math', '-ftree-vectorize', '-march=native'])
     env.Append(CPPDEFINES=['NDEBUG'])
     #Create a command line builder for the cython build step as it is not built into scons
-    CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus --gdb -o $TARGET $SOURCE')
+    CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus -o $TARGET $SOURCE')
     
 #For python modules we don't need the lib prefix
 env.Replace(SHLIBPREFIX='', SHLIBSUFFIX='.so')
