@@ -20,7 +20,7 @@ from scipy.constants import pi
 '''System Setup'''
 
 systemParams = SystemParams()
-qubit = SCQubit(3, 0e9, -100e6, name='Q1', T1=200e-9)
+qubit = SCQubit(3, 0e9, -100e6, name='Q1', T1=50e-9)
 systemParams.add_sub_system(qubit)
 systemParams.add_control_ham(inphase = Hamiltonian(0.5*(qubit.loweringOp + qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*qubit.loweringOp + 1j*qubit.raisingOp)))
 systemParams.add_control_ham(inphase = Hamiltonian(0.5*(qubit.loweringOp + qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*qubit.loweringOp + 1j*qubit.raisingOp)))
@@ -39,12 +39,12 @@ where we have a balance between selectivity and T1 decay
 '''
 
 pulseSeqs = []
-pulseTimes = 1e-9*np.arange(4,300, 2)
+pulseTimes = 1e-9*np.arange(4,100, 2)
 rhoIn = qubit.levelProjector(0)
 for pulseTime in pulseTimes:
     tmpPulseSeq = PulseSequence()
-    tmpPulseSeq.add_control_line(freq=0e9, initialPhase=0)
-    tmpPulseSeq.add_control_line(freq=0e9, initialPhase=-pi/2)
+    tmpPulseSeq.add_control_line(freq=0e9, phase=0)
+    tmpPulseSeq.add_control_line(freq=0e9, phase=-pi/2)
     pulseAmp = 0.5/pulseTime
     tmpPulseSeq.controlAmps = np.vstack((pulseAmp*np.array([[1]], dtype=np.float64), np.zeros(1)))
     tmpPulseSeq.timeSteps = pulseTime*np.ones(1)
@@ -68,8 +68,8 @@ pulseInt = np.sum(gaussPulse)
 pulseSeqs = []
 for ct,pulseTime in enumerate(pulseTimes):
     tmpPulseSeq = PulseSequence()
-    tmpPulseSeq.add_control_line(freq=0e9, initialPhase=0)
-    tmpPulseSeq.add_control_line(freq=0e9, initialPhase=-pi/2)
+    tmpPulseSeq.add_control_line(freq=0e9, phase=0)
+    tmpPulseSeq.add_control_line(freq=0e9, phase=-pi/2)
     pulseAmp = (0.5*gaussPulse.size)/(pulseTime*pulseInt)
     tmpPulseSeq.controlAmps = np.vstack((pulseAmp*gaussPulse, np.zeros(gaussPulse.size)))
     tmpPulseSeq.timeSteps = (pulseTime/gaussPulse.size)*np.ones(gaussPulse.size)
@@ -91,8 +91,8 @@ pulseInt = np.sum(gaussPulse)
 pulseSeqs = []
 for ct,pulseTime in enumerate(pulseTimes):
     tmpPulseSeq = PulseSequence()
-    tmpPulseSeq.add_control_line(freq=0e9, initialPhase=0)
-    tmpPulseSeq.add_control_line(freq=0e9, initialPhase=-pi/2)
+    tmpPulseSeq.add_control_line(freq=0e9, phase=0)
+    tmpPulseSeq.add_control_line(freq=0e9, phase=-pi/2)
     pulseAmp = (0.5*gaussPulse.size)/(pulseTime*pulseInt)
     #Have to muck around with DRAG scaling for some reason
     dragPulse = -0.08*(1.0/qubit.delta)*(4.0/pulseTime)*pulseAmp*(-xPts*np.exp(-0.5*(xPts**2)))
@@ -116,8 +116,8 @@ for ct, pulseTime in enumerate(pulseTimes):
     pulseParams.timeSteps = (pulseTime/numSteps)*np.ones(numSteps)
     pulseParams.rhoStart = qubit.levelProjector(0)
     pulseParams.rhoGoal = qubit.levelProjector(1)
-    pulseParams.add_control_line(freq=0, initialPhase=0)
-    pulseParams.add_control_line(freq=0, initialPhase=-pi/2)
+    pulseParams.add_control_line(freq=0, phase=0)
+    pulseParams.add_control_line(freq=0, phase=-pi/2)
     pulseParams.type = 'state2state'
 
     #Call the optimization    

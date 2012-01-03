@@ -22,7 +22,6 @@ from PySim.QuantumSystems import SCQubit
 from PySim.OptimalControl import optimize_pulse, PulseParams
 
 
-
 #Setup the system
 systemParams = SystemParams()
 
@@ -88,14 +87,14 @@ drive2Freq = Q2.omega-1e6
 
 pulseParams = PulseParams()
 pulseParams.timeSteps = timeStep*np.ones(144)
-pulseParams.add_control_line(freq=-drive1Freq, initialPhase=0, bandwidth=300e6, maxAmp=100e6)
-pulseParams.add_control_line(freq=-drive1Freq, initialPhase=-pi/2, bandwidth=300e6, maxAmp=100e6)
-#pulseParams.add_control_line(freq=-drive1Freq, initialPhase=0)
-#pulseParams.add_control_line(freq=-drive1Freq, initialPhase=pi/2)
-#pulseParams.add_control_line(freq=-drive2Freq, initialPhase=0, bandwidth=300e6, maxAmp=100e6)
-#pulseParams.add_control_line(freq=-drive2Freq, initialPhase=-pi/2, bandwidth=300e6, maxAmp=100e6)
+pulseParams.add_control_line(freq=-drive1Freq, phase=0, bandwidth=300e6, maxAmp=100e6)
+pulseParams.add_control_line(freq=-drive1Freq, phase=-pi/2, bandwidth=300e6, maxAmp=100e6)
+#pulseParams.add_control_line(freq=-drive1Freq, phase=0)
+#pulseParams.add_control_line(freq=-drive1Freq, phase=pi/2)
+#pulseParams.add_control_line(freq=-drive2Freq, phase=0, bandwidth=300e6, maxAmp=100e6)
+#pulseParams.add_control_line(freq=-drive2Freq, phase=-pi/2, bandwidth=300e6, maxAmp=100e6)
 #pulseParams.H_int = Hamiltonian(systemParams.expand_operator('Q1', drive1Freq*Q1.numberOp) + systemParams.expand_operator('Q2', drive2Freq*Q2.numberOp))
-pulseParams.type = 'unitary'
+pulseParams.optimType = 'unitary'
 
 Q2Goal = np.eye(3, dtype=np.complex128)
 Q2Goal[2,2] = 0
@@ -115,10 +114,13 @@ pulseParams.rhoGoal[3,3] = 1
 #Call the optimization
 pulseParams.fTol = 1e-4
 pulseParams.maxfun = 50
-pulseParams.derivType = 'exact'
+pulseParams.derivType = 'finiteDiff'
 
 pulseParams.startControlAmps = 0.01e9/2/pi*np.ones((2,144))
 optimize_pulse(pulseParams, systemParams)
+plt.figure()
+plt.plot(np.cumsum(pulseParams.timeSteps), pulseParams.controlAmps.T)
+plt.show()
 
 #Decimate the pulse down to the AWG sampling rate
 #pulseParams.controlAmps = decimate(pulseParams.controlAmps, 10, n=5, axis=1)
