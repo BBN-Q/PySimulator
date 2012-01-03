@@ -73,12 +73,24 @@ public:
 
 class OptimParams : public PulseSequence {
 public:
-	Mapcd Ugoal;
 	size_t dimC2;
 	int derivType;
+	int optimType;
+	Mapcd Ugoal;
+	Mapcd rhoStart;
+	Mapcd rhoGoal;
 
-	OptimParams(cdouble * UgoalPtr, size_t dim, size_t dimC2In) : Ugoal(UgoalPtr, dim, dim), dimC2(dimC2In) {};
-
+	OptimParams(cdouble * UgoalPtr, cdouble * rhoStartPtr, cdouble * rhoGoalPtr, size_t dim, size_t dimC2In) : Ugoal(NULL,0,0), rhoStart(NULL,0,0), rhoGoal(NULL,0,0), dimC2(dimC2In) {
+		if (UgoalPtr != NULL){
+			new (&Ugoal) Mapcd(UgoalPtr,dim,dim);
+		}
+		if (rhoStartPtr != NULL){
+			new (&rhoStart) Mapcd(rhoStartPtr,dim,dim);
+		}
+		if (rhoGoalPtr != NULL){
+			new (&rhoGoal) Mapcd(rhoGoalPtr,dim,dim);
+		}
+	};
 };
 
 //Class for holding intermediate propagator evolution results

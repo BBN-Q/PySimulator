@@ -34,9 +34,10 @@ cdef extern from "CPPBackEnd.h":
         vector[complex *] dissipatorPtrs
         
     cdef cppclass OptimParams(PulseSequence):
-        OptimParams(complex *, size_t, size_t)
+        OptimParams(complex *, complex *, complex *, size_t, size_t)
         size_t dimC2
         int derivType
+        int optimType
         
     cdef cppclass PropResults:
         PropResults(size_t, size_t)
@@ -125,7 +126,7 @@ cdef class PyControlHams_int(object):
 cdef class PyOptimParams(object):
     cdef OptimParams *thisPtr
     def __cinit__(self, optimParamsIn):
-        self.thisPtr = new OptimParams(<complex *> np.PyArray_DATA(optimParamsIn.Ugoal), optimParamsIn.Ugoal.shape[0], optimParamsIn.dimC2)    
+        self.thisPtr = new OptimParams(<complex *> np.PyArray_DATA(optimParamsIn.Ugoal), <complex*> np.PyArray_DATA(optimParamsIn.rhoStart), <complex*> np.PyArray_DATA(optimParamsIn.rhoGoal), optimParamsIn.Ugoal.shape[0], optimParamsIn.dimC2)    
         self.thisPtr.numControlLines = optimParamsIn.numControlLines
         self.thisPtr.numTimeSteps = optimParamsIn.numTimeSteps
         self.thisPtr.timeStepsPtr = <double *> np.PyArray_DATA(optimParamsIn.timeSteps)
@@ -139,6 +140,8 @@ cdef class PyOptimParams(object):
         self.thisPtr.H_intPtr = <complex *> np.PyArray_DATA(optimParamsIn.H_int.matrix) if optimParamsIn.H_int is not None else NULL
         derivTypeMap = {'finiteDiff':0, 'approx':1, 'exact':2}
         self.thisPtr.derivType = derivTypeMap[optimParamsIn.derivType]
+        optimTypeMap = {'unitary':0, 'state2state':1}
+        self.thisPtr.optimType = optimTypeMap[optimParamsIn.optimType]
 
     def __dealloc__(self):
         del self.thisPtr   

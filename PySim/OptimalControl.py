@@ -43,6 +43,7 @@ class PulseParams(PulseSequence):
         self.fTol = 1e-4    #optimization paramter: will exit when difference in fidelity is less than this. 
         self.maxfun = 15000
         self.derivType = 'approx'
+        self.optimType = 'unitary' #uniary or state2state optimization
 
 def create_random_pulse(numChannels, numPoints):
     '''
@@ -137,9 +138,9 @@ def eval_pulse(optimParams, systemParams, controlHams):
     Usim = evolution_unitary(optimParams, systemParams, controlHams)[0]
     
     #Use the trace fidelity to evaluate it
-    if optimParams.type == 'unitary':
+    if optimParams.optimType == 'unitary':
         return -(np.abs(np.trace(np.dot(Usim.conj().T, optimParams.Ugoal)))**2)/optimParams.dimC2
-    elif optimParams.type == 'state2state':
+    elif optimParams.optimType == 'state2state':
         rhoOut = np.dot(np.dot(Usim, optimParams.rhoStart), Usim.conj().T)
         return -(np.abs(np.trace(np.dot(rhoOut, optimParams.rhoGoal))))**2
     else:
@@ -174,9 +175,9 @@ def eval_derivs(optimParams, systemParams, controlHams):
     
     #And now the backwards evolution
     Uback = np.zeros_like(Usteps, dtype=np.complex128)
-    if optimParams.type == 'unitary':
+    if optimParams.optimType == 'unitary':
         Uback[-1] = optimParams.Ugoal
-    elif optimParams.type == 'state2state':
+    elif optimParams.optimType == 'state2state':
         Uback[-1] = np.eye(systemParams.dim, dtype = np.complex128)
     else:
         raise KeyError('Unknown optimization type.  Currently handle "unitary" or "state2state"')
@@ -186,7 +187,7 @@ def eval_derivs(optimParams, systemParams, controlHams):
     #Now calculate the derivatives
     #We often use the identity that trace(A^\dagger*B) = np.sum(A.conj()*B) but it doesn't seem to be any faster
     derivs = np.zeros((systemParams.numControlHams, numSteps), dtype=np.float64)
-    if optimParams.type == 'unitary':
+    if optimParams.optimType == 'unitary':
         curOverlap = np.sum(Uforward[-1].conj()*optimParams.Ugoal)
         for timect in range(numSteps):
             #Put the Hz to rad conversion in the timestep
@@ -229,7 +230,7 @@ def eval_derivs(optimParams, systemParams, controlHams):
                 else:
                     raise NameError('Unknown derivative type for unitary search.')
     
-    elif optimParams.type == 'state2state':
+    elif optimParams.optimType == 'state2state':
         rhoSim = np.dot(np.dot(Uforward[-1], optimParams.rhoStart), Uforward[-1].conj().T)
         tmpMult = np.sum(rhoSim.T*optimParams.rhoGoal)
         if optimParams.derivType == 'approx':
@@ -258,7 +259,7 @@ def optimize_pulse(optimParams, systemParams):
         
     #Figure out the dimension (squared) of the computational space from the desired unitary
     #We use this for normalizing the results
-    optimParams.dimC2 = np.abs(np.trace(np.dot(optimParams.Ugoal.conj().T, optimParams.Ugoal)))**2 if optimParams.type == 'unitary' else 0
+    optimParams.dimC2 = np.abs(np.trace(np.dot(optimParams.Ugoal.conj().T, optimParams.Ugoal)))**2 if optimParams.optimType == 'unitary' else 0
     
     #Calculate the interaction frame Hamiltonians
     controlHams_int = calc_control_Hams(optimParams, systemParams)
