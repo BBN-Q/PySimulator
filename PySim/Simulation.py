@@ -19,18 +19,24 @@ def simulate_sequence(pulseSeq=None, systemParams=None, rhoIn=None, simType='uni
     '''
     Simulate a single pulse sequence and return the expectation value of the measurement.
     '''
-    
-    
     if simType == 'unitary':
-        tmpU = evolution_unitary(pulseSeq, systemParams)
-        rhoOut = np.dot(np.dot(tmpU,rhoIn), tmpU.conj().transpose())
+        totProp = evolution_unitary(pulseSeq, systemParams)
+        rhoOut = np.dot(np.dot(totProp,rhoIn), totProp.conj().transpose())
     elif simType == 'lindblad':
-        rhoOut = evolution_lindblad(pulseSeq, systemParams, rhoIn)
+        totProp = evolution_lindblad(pulseSeq, systemParams, rhoIn)
+        #Reshape, propagate and reshape again the density matrix
+        rhoOut = (np.dot(totProp, rhoIn.reshape((systemParams.dim**2,1), order='F'))).reshape((systemParams.dim,systemParams.dim), order='F')
     else:
         raise NameError('Unknown simulation type.')
     
-    #Return the expectation value of the measurement operator    
-    return np.real(np.trace(np.dot(systemParams.measurement, rhoOut)))
+    #Return the expectation value of the measurement operator the unitary and the rhouut
+    if systemParams.measurement is not None:    
+        measOut =  np.real(np.trace(np.dot(systemParams.measurement, rhoOut)))
+    else:
+        measOut = None
+    
+    #Return everything
+    return measOut, totProp, rhoOut
     
 def simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary'):
     '''
@@ -60,8 +66,14 @@ def simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary'):
             break
     
     pbar.finish()
+    
+    tmpResults = results.get()
             
-    #Extract the results into a numpy array. 
-    return np.array(results.get(), dtype=np.float64)
+    #Extract the measurement results into a numpy array. 
+    measResults = np.array([tmpResult[0] for tmpResult in tmpResults], dtype=np.float64)
+    
+    props = [tmpResult[1] for tmpResult in tmpResults]
         
-        
+    rhos = [tmpResult[2] for tmpResult in tmpResults]
+    
+    return measResults, props, rhos

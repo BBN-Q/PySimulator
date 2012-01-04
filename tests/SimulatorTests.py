@@ -3,6 +3,7 @@ Created on Nov 7, 2011
 
 @author: cryan
 '''
+
 import unittest
 
 import numpy as np
@@ -11,22 +12,22 @@ from scipy.constants import pi
 
 import matplotlib.pyplot as plt
 
-from SystemParams import SystemParams
-from PulseSequence import PulseSequence
-from Simulation import simulate_sequence_stack, simulate_sequence
-from QuantumSystems import SCQubit, Hamiltonian, Dissipator
+from PySim.SystemParams import SystemParams
+from PySim.PulseSequence import PulseSequence
+from PySim.Simulation import simulate_sequence_stack, simulate_sequence
+from PySim.QuantumSystems import SCQubit, Hamiltonian, Dissipator
 
 
 class SingleQubit(unittest.TestCase):
-
 
     def setUp(self):
         #Setup the system
         self.systemParams = SystemParams()
         self.qubit = SCQubit(2,0e9, name='Q1', T1=1e-6)
         self.systemParams.add_sub_system(self.qubit)
-        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
-        self.systemParams.measurement = -self.qubit.pauliZ
+        #self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*self.qubit.pauliX), quadrature = Hamiltonian(0.5*self.qubit.pauliY))
+        self.systemParams.measurement = self.qubit.pauliZ
         self.systemParams.create_full_Ham()
         
         #Define Rabi frequency and pulse lengths
@@ -49,7 +50,7 @@ class SingleQubit(unittest.TestCase):
         pulseSeqs = []
         for pulseLength in self.pulseLengths:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=0e9, phase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([pulseLength])
             tmpPulseSeq.maxTimeStep = pulseLength
@@ -57,15 +58,19 @@ class SingleQubit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
         
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
-    
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
+        expectedResults = np.cos(2*pi*self.rabiFreq*self.pulseLengths)
         if plotResults:
             plt.figure()
             plt.plot(self.pulseLengths,results)
+            plt.plot(self.pulseLengths, expectedResults, color='r', linestyle='--', linewidth=2)
             plt.title('10MHz Rabi Oscillations in Rotating Frame')
+            plt.xlabel('Pulse Length')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', '10MHz Cosine'))
             plt.show()
 
-        np.testing.assert_allclose(results, np.cos(2*pi*self.rabiFreq*self.pulseLengths), atol = 1e-4)
+        np.testing.assert_allclose(results, expectedResults , atol = 1e-4)
 
     def testRabiInteractionFrame(self):
         '''
@@ -81,7 +86,7 @@ class SingleQubit(unittest.TestCase):
         for pulseLength in self.pulseLengths:
         
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=5.0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-5.0e9, phase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([pulseLength])
             tmpPulseSeq.maxTimeStep = pi/2*1e-10
@@ -89,16 +94,106 @@ class SingleQubit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
             
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
-    
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
+        expectedResults = np.cos(2*pi*self.rabiFreq*self.pulseLengths)
         if plotResults:
             plt.figure()
             plt.plot(self.pulseLengths,results)
-            plt.title('10MHz Rabi Oscillations using Interaction Frame')
+            plt.plot(self.pulseLengths, expectedResults, color='r', linestyle='--', linewidth=2)
+            plt.title('10MHz Rabi Oscillations in Rotating Frame')
+            plt.xlabel('Pulse Length')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', '10MHz Cosine'))
             plt.show()
 
-        np.testing.assert_allclose(results, np.cos(2*pi*self.rabiFreq*self.pulseLengths), atol = 1e-4)
+        np.testing.assert_allclose(results, expectedResults , atol = 1e-4)
+        
+    def testRamsey(self):
+        '''
+        Just look at Ramsey decay to make sure we get the off-resonance right.
+        '''
+        
+        #Setup the system
+        self.systemParams.subSystems[0] = SCQubit(2,5e9, 'Q1')
+        self.systemParams.create_full_Ham()
+        self.systemParams.dissipators = [Dissipator(self.qubit.T1Dissipator)]
+        
+        #Setup the pulseSequences
+        delays = np.linspace(0,8e-6,200)
+        t90 = 0.25*(1/self.rabiFreq)
+        offRes = 0.56789e6
+        pulseSeqs = []
+        for delay in delays:
+        
+            tmpPulseSeq = PulseSequence()
+            #Shift the pulsing frequency down by offRes
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), phase=0)
+            #Pulse sequence is X90, delay, X90
+            tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0, 1]], dtype=np.float64)
+            tmpPulseSeq.timeSteps = np.array([t90, delay, t90])
+            #Interaction frame with some odd frequency
+            tmpPulseSeq.H_int = Hamiltonian(np.array([[0,0], [0, 5.00e9]], dtype = np.complex128))
+            
+            pulseSeqs.append(tmpPulseSeq)
+            
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')[0]
+        expectedResults = -np.cos(2*pi*offRes*(delays+t90))*np.exp(-delays/(2*self.qubit.T1))
+        if plotResults:
+            plt.figure()
+            plt.plot(1e6*delays,results)
+            plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
+            plt.title('Ramsey Fringes 0.56789MHz Off-Resonance')
+            plt.xlabel('Pulse Spacing (us)')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', '0.57MHz Cosine with T1 limited decay.'))
+            plt.show()
 
+    def testYPhase(self):
+        
+        '''
+        Make sure the frame-handedness matches what we expect: i.e. if the qubit frequency is 
+        greater than the driver frequency this corresponds to a positive rotation.
+        '''        
+        #Setup the system
+        self.systemParams.subSystems[0] = SCQubit(2,5e9, 'Q1')
+        self.systemParams.create_full_Ham()
+        
+        #Add a Y control Hamiltonian 
+        self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*self.qubit.pauliX), quadrature = Hamiltonian(0.5*self.qubit.pauliY))
+        
+        #Setup the pulseSequences
+        delays = np.linspace(0,8e-6,200)
+        t90 = 0.25*(1/self.rabiFreq)
+        offRes = 1.2345e6
+        pulseSeqs = []
+        for delay in delays:
+        
+            tmpPulseSeq = PulseSequence()
+            #Shift the pulsing frequency down by offRes
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), phase=0)
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), phase=-pi/2)
+            #Pulse sequence is X90, delay, Y90
+            tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0, 0],[0,0,1]], dtype=np.float64)
+            tmpPulseSeq.timeSteps = np.array([t90, delay, t90])
+            #Interaction frame with some odd frequency
+            tmpPulseSeq.H_int = Hamiltonian(np.array([[0,0], [0, 5.00e9]], dtype = np.complex128))
+            
+            pulseSeqs.append(tmpPulseSeq)
+            
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')[0]
+        expectedResults = -np.sin(2*pi*offRes*(delays+t90))
+        if plotResults:
+            plt.figure()
+            plt.plot(1e6*delays,results)
+            plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
+            plt.title('Ramsey Fringes {0:.2f} MHz Off-Resonance'.format(offRes/1e6))
+            plt.xlabel('Pulse Spacing (us)')
+            plt.ylabel(r'$\sigma_z$')
+            plt.legend(('Simulated Results', ' {0:.2f} MHz -Sin.'.format(offRes/1e6) ))
+            plt.show()
+        
+
+        
     def testT1Recovery(self):
         '''
         Test a simple T1 recovery without any pulses.  Start in the first excited state and watch recovery down to ground state.
@@ -110,23 +205,27 @@ class SingleQubit(unittest.TestCase):
         pulseSeqs = []
         for tmpDelay in delays:
             tmpPulseSeq = PulseSequence()
+            tmpPulseSeq.add_control_line()
+            tmpPulseSeq.controlAmps = np.array([[0]])
             tmpPulseSeq.timeSteps = np.array([tmpDelay])
             tmpPulseSeq.maxTimeStep = tmpDelay
             tmpPulseSeq.H_int = None
             
             pulseSeqs.append(tmpPulseSeq)
         
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, np.array([[0,0],[0,1]], dtype=np.complex128), simType='lindblad')
-    
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, np.array([[0,0],[0,1]], dtype=np.complex128), simType='lindblad')[0]
+        expectedResults = 1-2*np.exp(-delays/self.qubit.T1)
         if plotResults:
             plt.figure()
             plt.plot(1e6*delays,results)
+            plt.plot(1e6*delays, expectedResults, color='r', linestyle='--', linewidth=2)
             plt.xlabel(r'Recovery Time ($\mu$s)')
             plt.ylabel(r'Expectation Value of $\sigma_z$')
             plt.title(r'$T_1$ Recovery to the Ground State')
+            plt.legend(('Simulated Results', 'Exponential T1 Recovery'))
             plt.show()
         
-        np.testing.assert_allclose(results, 1-2*np.exp(-delays/1e-6), atol=1e-4)
+        np.testing.assert_allclose(results, expectedResults, atol=1e-4)
         
 class SingleQutrit(unittest.TestCase):
 
@@ -136,7 +235,7 @@ class SingleQutrit(unittest.TestCase):
         self.qubit = SCQubit(3, 5e9, -100e6, name='Q1', T1=2e-6)
         self.systemParams.add_sub_system(self.qubit)
         self.systemParams.add_control_ham(inphase = Hamiltonian(0.5*(self.qubit.loweringOp + self.qubit.raisingOp)), quadrature = Hamiltonian(-0.5*(-1j*self.qubit.loweringOp + 1j*self.qubit.raisingOp)))
-        self.systemParams.measurement = -self.qubit.pauliZ
+        self.systemParams.measurement = self.qubit.pauliZ
         self.systemParams.create_full_Ham()
         
         #Add the 2us T1 dissipator
@@ -162,7 +261,7 @@ class SingleQutrit(unittest.TestCase):
         pulseSeqs = []
         for freq in freqSweep:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=freq, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=freq, phase=0)
             tmpPulseSeq.controlAmps = np.array([[rabiFreq]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([10e-6])
             tmpPulseSeq.maxTimeStep = np.Inf
@@ -170,7 +269,7 @@ class SingleQutrit(unittest.TestCase):
             
             pulseSeqs.append(tmpPulseSeq)
         
-        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')
+        results = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='lindblad')[0]
 
         if plotResults:        
             plt.figure()
@@ -192,10 +291,10 @@ class TwoQubit(unittest.TestCase):
         self.Q2 = SCQubit(2, 6e9, name='Q2')
         self.systemParams.add_sub_system(self.Q2)
         X = 0.5*(self.Q1.loweringOp + self.Q1.raisingOp)
-        Y = -0.5*(-1j*self.Q1.loweringOp + 1j*self.Q2.raisingOp)
+        Y = 0.5*(-1j*self.Q1.loweringOp + 1j*self.Q2.raisingOp)
         self.systemParams.add_control_ham(inphase = Hamiltonian(self.systemParams.expand_operator('Q1', X)), quadrature = Hamiltonian(self.systemParams.expand_operator('Q1', Y)))
         self.systemParams.add_control_ham(inphase = Hamiltonian(self.systemParams.expand_operator('Q2', X)), quadrature = Hamiltonian(self.systemParams.expand_operator('Q2', Y)))
-        self.systemParams.measurement = -self.systemParams.expand_operator('Q1', self.Q1.pauliZ) - self.systemParams.expand_operator('Q2', self.Q2.pauliZ)
+        self.systemParams.measurement = self.systemParams.expand_operator('Q1', self.Q1.pauliZ) + self.systemParams.expand_operator('Q2', self.Q2.pauliZ)
         self.systemParams.create_full_Ham()
         
         #Define Rabi frequency and pulse lengths
@@ -223,7 +322,8 @@ class TwoQubit(unittest.TestCase):
         pulseSeqs = []
         for delay in delays:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=5.0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-5.0e9, phase=0)
+            tmpPulseSeq.add_control_line(freq=-6.0e9, phase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0], [0,0]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([25e-9, delay])
             tmpPulseSeq.maxTimeStep = np.Inf
@@ -232,9 +332,9 @@ class TwoQubit(unittest.TestCase):
             pulseSeqs.append(tmpPulseSeq)
         
         self.systemParams.measurement = np.kron(self.Q1.pauliX, self.Q2.pauliZ)
-        resultsXZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+        resultsXZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
         self.systemParams.measurement = np.kron(self.Q1.pauliY, self.Q2.pauliZ)
-        resultsYZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')
+        resultsYZ = simulate_sequence_stack(pulseSeqs, self.systemParams, self.rhoIn, simType='unitary')[0]
 
         if plotResults:
             plt.figure()
@@ -251,3 +351,6 @@ if __name__ == "__main__":
     plotResults = True
     
     unittest.main()
+#    singleTest = unittest.TestSuite()
+#    singleTest.addTest(SingleQubit("testYPhase"))
+#    unittest.TextTestRunner(verbosity=2).run(singleTest)
