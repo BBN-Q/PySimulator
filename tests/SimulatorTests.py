@@ -50,7 +50,7 @@ class SingleQubit(unittest.TestCase):
         pulseSeqs = []
         for pulseLength in self.pulseLengths:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=0e9, phase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([pulseLength])
             tmpPulseSeq.maxTimeStep = pulseLength
@@ -86,7 +86,7 @@ class SingleQubit(unittest.TestCase):
         for pulseLength in self.pulseLengths:
         
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=-5.0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-5.0e9, phase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([pulseLength])
             tmpPulseSeq.maxTimeStep = pi/2*1e-10
@@ -127,7 +127,7 @@ class SingleQubit(unittest.TestCase):
         
             tmpPulseSeq = PulseSequence()
             #Shift the pulsing frequency down by offRes
-            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), phase=0)
             #Pulse sequence is X90, delay, X90
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0, 1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([t90, delay, t90])
@@ -170,8 +170,8 @@ class SingleQubit(unittest.TestCase):
         
             tmpPulseSeq = PulseSequence()
             #Shift the pulsing frequency down by offRes
-            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), initialPhase=0)
-            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), initialPhase=-pi/2)
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), phase=0)
+            tmpPulseSeq.add_control_line(freq=-(5.0e9-offRes), phase=-pi/2)
             #Pulse sequence is X90, delay, Y90
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0, 0],[0,0,1]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([t90, delay, t90])
@@ -261,7 +261,7 @@ class SingleQutrit(unittest.TestCase):
         pulseSeqs = []
         for freq in freqSweep:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=freq, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=freq, phase=0)
             tmpPulseSeq.controlAmps = np.array([[rabiFreq]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([10e-6])
             tmpPulseSeq.maxTimeStep = np.Inf
@@ -322,8 +322,8 @@ class TwoQubit(unittest.TestCase):
         pulseSeqs = []
         for delay in delays:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=-5.0e9, initialPhase=0)
-            tmpPulseSeq.add_control_line(freq=-6.0e9, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-5.0e9, phase=0)
+            tmpPulseSeq.add_control_line(freq=-6.0e9, phase=0)
             tmpPulseSeq.controlAmps = self.rabiFreq*np.array([[1, 0], [0,0]], dtype=np.float64)
             tmpPulseSeq.timeSteps = np.array([25e-9, delay])
             tmpPulseSeq.maxTimeStep = np.Inf

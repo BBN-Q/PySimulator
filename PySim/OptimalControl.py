@@ -22,6 +22,15 @@ import matplotlib.pyplot as plt
 from PulseSequence import PulseSequence
 from QuantumSystems import Hamiltonian
 
+from Evolution import expm_eigen
+
+#Try to load the CPPBackEnd
+try:
+    import PySim.CySim
+    CPPBackEnd = True
+except ImportError:
+    CPPBackEnd = False
+
 class PulseParams(PulseSequence):
     '''
     For now just a container for pulse optimization parameters.  Subclasses a PulseSequence as it has to define similar things.
@@ -34,13 +43,28 @@ class PulseParams(PulseSequence):
         self.fTol = 1e-4    #optimization paramter: will exit when difference in fidelity is less than this. 
         self.maxfun = 15000
         self.derivType = 'approx'
+        self.optimType = 'unitary' #uniary or state2state optimization
+        self.Ugoal = None
+        self.rhoStart = None
+        self.rhoGoal = None
+    
+    @property
+    def dim(self):
+        if self.Ugoal is not None:
+            return self.Ugoal.shape[0]
+        else:
+            if self.rhoStart is not None:
+                return self.rhoStart.shape[0]
+            else:
+                return 0
+                
 
 def create_random_pulse(numChannels, numPoints):
     '''
     Helper function to create smooth pulse starting point.
     '''
     #TODO: return something besides ones
-    return 1e6*np.ones((numChannels, numPoints))
+    return 2e6*np.ones((numChannels, numPoints))
 
 
 def calc_control_Hams(optimParams, systemParams):
@@ -56,7 +80,7 @@ def calc_control_Hams(optimParams, systemParams):
         
         #Loop over each of the control Hamiltonians
         for controlct, tmpControl in enumerate(optimParams.controlLines):
-            tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.initialPhase
+            tmpPhase = 2*pi*tmpControl.freq*curTime + tmpControl.phase
             if tmpControl.controlType == 'rotating':
                 tmpHam = Hamiltonian(cos(tmpPhase)*systemParams.controlHams[controlct]['inphase'].matrix + sin(tmpPhase)*systemParams.controlHams[controlct]['quadrature'].matrix)
             elif tmpControl.controlType == 'sinusoidal':
@@ -105,9 +129,7 @@ def evolution_unitary(optimParams, systemParams, controlHams):
 
         #Propagate the unitary
         totHams[timect] = Htot.matrix
-        Ds[timect], Vs[timect] = eigh(Htot.matrix)
-        timeStepUs[timect] = np.dot(Vs[timect], np.exp(-1j*2*pi*timeStep*Ds[timect]).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*Vs[timect].conj().T)
-        
+        timeStepUs[timect], Ds[timect], Vs[timect] = expm_eigen(Htot.matrix, -1j*2*pi*timeStep)
         totU = np.dot(timeStepUs[timect],totU)
         
         #Update the times
@@ -130,9 +152,9 @@ def eval_pulse(optimParams, systemParams, controlHams):
     Usim = evolution_unitary(optimParams, systemParams, controlHams)[0]
     
     #Use the trace fidelity to evaluate it
-    if optimParams.type == 'unitary':
+    if optimParams.optimType == 'unitary':
         return -(np.abs(np.trace(np.dot(Usim.conj().T, optimParams.Ugoal)))**2)/optimParams.dimC2
-    elif optimParams.type == 'state2state':
+    elif optimParams.optimType == 'state2state':
         rhoOut = np.dot(np.dot(Usim, optimParams.rhoStart), Usim.conj().T)
         return -(np.abs(np.trace(np.dot(rhoOut, optimParams.rhoGoal))))**2
     else:
@@ -167,9 +189,9 @@ def eval_derivs(optimParams, systemParams, controlHams):
     
     #And now the backwards evolution
     Uback = np.zeros_like(Usteps, dtype=np.complex128)
-    if optimParams.type == 'unitary':
+    if optimParams.optimType == 'unitary':
         Uback[-1] = optimParams.Ugoal
-    elif optimParams.type == 'state2state':
+    elif optimParams.optimType == 'state2state':
         Uback[-1] = np.eye(systemParams.dim, dtype = np.complex128)
     else:
         raise KeyError('Unknown optimization type.  Currently handle "unitary" or "state2state"')
@@ -179,7 +201,7 @@ def eval_derivs(optimParams, systemParams, controlHams):
     #Now calculate the derivatives
     #We often use the identity that trace(A^\dagger*B) = np.sum(A.conj()*B) but it doesn't seem to be any faster
     derivs = np.zeros((systemParams.numControlHams, numSteps), dtype=np.float64)
-    if optimParams.type == 'unitary':
+    if optimParams.optimType == 'unitary':
         curOverlap = np.sum(Uforward[-1].conj()*optimParams.Ugoal)
         for timect in range(numSteps):
             #Put the Hz to rad conversion in the timestep
@@ -211,10 +233,8 @@ def eval_derivs(optimParams, systemParams, controlHams):
 
                 elif optimParams.derivType == 'finiteDiff':
                     #Finite difference approach
-                    tmpD, tmpV = eigh(totHams[timect] + 1e-6*controlHams[controlct,timect])
-                    tmpU1 = np.dot(tmpV, np.exp(-1j*tmpTimeStep*tmpD).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*tmpV.conj().T)
-                    tmpD, tmpV = eigh(totHams[timect] - 1e-6*controlHams[controlct,timect])
-                    tmpU2 = np.dot(tmpV, np.exp(-1j*tmpTimeStep*tmpD).repeat(systemParams.dim).reshape((systemParams.dim, systemParams.dim))*tmpV.conj().T)
+                    tmpU1 = expm_eigen(totHams[timect] + 1e-6*controlHams[controlct,timect], -1j*tmpTimeStep)[0]
+                    tmpU2 = expm_eigen(totHams[timect] - 1e-6*controlHams[controlct,timect], -1j*tmpTimeStep)[0]
                     dUjduk = (tmpU1-tmpU2)/2e-6
                     if timect == 0:
                         derivs[controlct, timect] =  (2.0/optimParams.dimC2)*np.real(np.sum(Uback[timect].conj()*dUjduk) * curOverlap)
@@ -224,7 +244,7 @@ def eval_derivs(optimParams, systemParams, controlHams):
                 else:
                     raise NameError('Unknown derivative type for unitary search.')
     
-    elif optimParams.type == 'state2state':
+    elif optimParams.optimType == 'state2state':
         rhoSim = np.dot(np.dot(Uforward[-1], optimParams.rhoStart), Uforward[-1].conj().T)
         tmpMult = np.sum(rhoSim.T*optimParams.rhoGoal)
         if optimParams.derivType == 'approx':
@@ -253,7 +273,7 @@ def optimize_pulse(optimParams, systemParams):
         
     #Figure out the dimension (squared) of the computational space from the desired unitary
     #We use this for normalizing the results
-    optimParams.dimC2 = np.abs(np.trace(np.dot(optimParams.Ugoal.conj().T, optimParams.Ugoal)))**2 if optimParams.type == 'unitary' else None
+    optimParams.dimC2 = np.abs(np.trace(np.dot(optimParams.Ugoal.conj().T, optimParams.Ugoal)))**2 if optimParams.optimType == 'unitary' else 0
     
     #Calculate the interaction frame Hamiltonians
     controlHams_int = calc_control_Hams(optimParams, systemParams)
@@ -266,13 +286,32 @@ def optimize_pulse(optimParams, systemParams):
         optimParams.H_int.matrix *= pulseTime
     curPulse *= pulseTime
     
-    #Create some helper functions for the goodness and derivative evaluation
-    def tmpEvalPulse(pulseIn):
-        optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
-        return eval_pulse(optimParams, systemParams, controlHams_int)
+    '''
+    Create some helper functions for the goodness and derivative evaluation
+    If we are using the C++ backend then we define some C classes to store C pointers to the data and control Hamiltonians and temporary propagator results
+    which we can then pass to the evaluator functions.
+    '''
+    if CPPBackEnd:
+        controlHams_int_CPP = PySim.CySim.PyControlHams_int(controlHams_int)
+        optimParams_CPP = PySim.CySim.PyOptimParams(optimParams)
+        systemParams_CPP = PySim.CySim.PySystemParams(systemParams)
+        propResults_CPP = PySim.CySim.PyPropResults(optimParams.numTimeSteps, systemParams.dim)
         
-    def tmpEvalDerivs(pulseIn):
-        optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+        def tmpEvalPulse(pulseIn):
+            optimParams_CPP.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+            return PySim.CySim.Cy_eval_pulse(optimParams_CPP, systemParams_CPP, controlHams_int_CPP, propResults_CPP)
+        
+        def tmpEvalDerivs(pulseIn):
+            optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+            return PySim.CySim.Cy_eval_derivs(optimParams_CPP, systemParams_CPP, controlHams_int_CPP, propResults_CPP)
+    else:
+    
+        def tmpEvalPulse(pulseIn):
+            optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
+            return eval_pulse(optimParams, systemParams, controlHams_int)
+            
+        def tmpEvalDerivs(pulseIn):
+            optimParams.controlAmps = pulseIn.reshape((optimParams.numControlLines, optimParams.numTimeSteps))
         
         #Code for evaluating goodness of derivatives. 
 #        origGoodness = eval_pulse(optimParams, systemParams, controlHams_int)
@@ -290,7 +329,7 @@ def optimize_pulse(optimParams, systemParams):
 #            plt.plot(finiteDerivs,'g--')
 #            plt.show()
             
-        return eval_derivs(optimParams, systemParams, controlHams_int)
+            return eval_derivs(optimParams, systemParams, controlHams_int)
     
     #We can use these to take into account power limits and to squeeze the pulse down to zero and the start and finish for finite bandwidth concerns
     #We'll use a Gaussian filter to achieve a ramp up and ramp down on the pulse edges 
@@ -322,6 +361,7 @@ def optimize_pulse(optimParams, systemParams):
     #Call the scipy minimizer
     optimResults = fmin_l_bfgs_b(tmpEvalPulse, curPulse.flatten(), fprime=tmpEvalDerivs, bounds=bounds, iprint=0, maxfun=optimParams.maxfun)
     
+    #Reshape the optimized pulse from a 1D vector
     foundPulse = optimResults[0].reshape((optimParams.numControlLines, optimParams.numTimeSteps))
    
 #    #Rescale time

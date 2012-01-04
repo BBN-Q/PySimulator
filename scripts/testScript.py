@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from PySim.SystemParams import SystemParams
 from PySim.QuantumSystems import Hamiltonian, Dissipator
 from PySim.PulseSequence import PulseSequence
-from PySim.Simulation import simulate_sequence_stack
+from PySim.Simulation import simulate_sequence_stack, simulate_sequence
 from PySim.QuantumSystems import SCQubit
 
 if __name__ == '__main__':
@@ -56,10 +56,10 @@ if __name__ == '__main__':
                                   quadrature = Hamiltonian(systemParams.expand_operator('Q1', Y) + crossCoupling*systemParams.expand_operator('Q2', Y)))
     
     #Setup the measurement operator
-    systemParams.measurement = np.kron(Q1.levelProjector(1), Q2.levelProjector(1))
-#    systemParams.measurement = 0.5*np.kron(Q1.levelProjector(0), Q2.levelProjector(0)) + 0.67*np.kron(Q1.levelProjector(1), Q2.levelProjector(0)) + \
-#                                0.64*np.kron(Q1.levelProjector(0), Q2.levelProjector(1)) + 0.72*np.kron(Q1.levelProjector(0), Q2.levelProjector(2)) + \
-#                                0.75*np.kron(Q1.levelProjector(1), Q2.levelProjector(1))
+#    systemParams.measurement = np.kron(Q1.levelProjector(1), Q2.levelProjector(1))
+    systemParams.measurement = 0.5*np.kron(Q1.levelProjector(0), Q2.levelProjector(0)) + 0.67*np.kron(Q1.levelProjector(1), Q2.levelProjector(0)) + \
+                                0.64*np.kron(Q1.levelProjector(0), Q2.levelProjector(1)) + 0.72*np.kron(Q1.levelProjector(0), Q2.levelProjector(2)) + \
+                                0.75*np.kron(Q1.levelProjector(1), Q2.levelProjector(1)) + 0.78*np.kron(Q1.levelProjector(1), Q2.levelProjector(2)) 
 
     #Add the T1 dissipators
     systemParams.dissipators.append(Dissipator(systemParams.expand_operator('Q1', Q1.T1Dissipator)))
@@ -70,22 +70,22 @@ if __name__ == '__main__':
     rhoIn[0,0] = 1
 
     #First run 1D spectroscopy around the Bell-Rabi drive frequency
-    freqSweep = 1e9*np.linspace(5.01, 5.040, 1000)
+    freqSweep = 1e9*np.linspace(5.02, 5.040, 20)
 #    freqSweep = [5.023e9]
     ampSweep = np.linspace(-1,1,80)
-    x = np.linspace(-2,2,20)
+    x = np.linspace(-2,2,100)
     pulseAmps = (np.exp(-x**2)).reshape((1,x.size))
 #    pulseAmps = np.ones((1,1))
-    ampSweep = [0.1]
+#    ampSweep = [0.1]
     
-    rabiFreq = 200e6
+    rabiFreq = 100e6
     
     #Setup the pulseSequences as a series of 10us low-power pulses at different frequencies
     pulseSeqs = []
     for freq in freqSweep:
         for controlAmp in ampSweep:
             tmpPulseSeq = PulseSequence()
-            tmpPulseSeq.add_control_line(freq=-freq, initialPhase=0)
+            tmpPulseSeq.add_control_line(freq=-freq, phase=0)
             tmpPulseSeq.controlAmps = rabiFreq*controlAmp*pulseAmps
             tmpPulseSeq.timeSteps = 5e-9*np.ones(x.size)
             tmpMat = freq*Q1.numberOp
@@ -94,9 +94,9 @@ if __name__ == '__main__':
             pulseSeqs.append(tmpPulseSeq)
     
     results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='lindblad')[0]
-#    results.resize((freqSweep.size, ampSweep.size))
-    plt.plot(freqSweep,results)
-    plt.show()
+    results.resize((freqSweep.size, ampSweep.size))
+#    plt.plot(freqSweep,results)
+#    plt.show()
 #    plt.figure()
 ##    plt.plot(ampSweep, results)
 ##    plt.xlabel('Frequency')

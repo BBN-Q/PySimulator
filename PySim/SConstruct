@@ -1,0 +1,43 @@
+#We need distutils to get the location of the python headers and numpy to get the numpy headers and os to get the PATH
+import distutils.sysconfig
+import numpy
+import os
+import platform
+
+#Setup the initial environment with the path from the distutils to the python header files and the PATH
+env = Environment(CPPPATH=[distutils.sysconfig.get_python_inc()], ENV = {'PATH' : os.environ['PATH']})
+
+ccvars = distutils.sysconfig.get_config_var('CXXFLAGS')
+
+# set system specific linking params
+ldvars = distutils.sysconfig.get_config_var('LDCXXSHARED').split()[1:]
+env.Replace(SHLINKFLAGS=ldvars)
+
+#Load the location of the eigen headers and append it and the numpy header location to the include path
+EIGENDIR = ARGUMENTS.get('EIGENDIR')
+env.Append(CPPPATH=[EIGENDIR, numpy.get_include()])
+
+#Since we interact with numpy we'll use row major storage
+env.Append(CPPDEFINES=['EIGEN_DEFAULT_TO_ROW_MAJOR'])
+
+#Set our optimization parameters based on whether we are in debug mode or not
+debugFlag = int(ARGUMENTS.get('debug', 0))
+if debugFlag:
+    env.Append(CPPFLAGS=['-g'])
+    #Create a command line builder for the cython build step as it is not built into scons
+    CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus --gdb -o $TARGET $SOURCE')
+else:
+    if platform.system() == 'Darwin':
+        # warning: march=native doesn't work on GCC 4.2 that comes with OS 10.7
+        env.Append(CPPFLAGS=['-fast', '-ftree-vectorize', '-march=core2'])
+    else:
+        env.Append(CPPFLAGS=['-O3', '-ffast-math', '-ftree-vectorize', '-march=native'])
+    env.Append(CPPDEFINES=['NDEBUG'])
+    #Create a command line builder for the cython build step as it is not built into scons
+    CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus -o $TARGET $SOURCE')
+    
+#For python modules we don't need the lib prefix
+env.Replace(SHLIBPREFIX='', SHLIBSUFFIX='.so')
+#Define the shared library target for building 
+CyModule = env.SharedLibrary(target='CySim', source=['CPPBackEnd.cpp', CyBuilder])
+

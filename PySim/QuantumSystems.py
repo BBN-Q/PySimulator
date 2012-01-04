@@ -134,7 +134,7 @@ class Hamiltonian(object):
         '''
         Constructor
         '''
-        self.matrix = matrix
+        self.matrix = np.complex128(matrix)
         self.interactionMatrix = None
         self.dim = matrix.shape[0] if matrix is not None else 0
         

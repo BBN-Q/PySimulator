@@ -46,7 +46,7 @@ class Test(unittest.TestCase):
         pulseParams.rhoGoal = Q1.levelProjector(1)
         pulseParams.add_control_line(freq=-Q1.omega)
         pulseParams.H_int = Hamiltonian(Q1.omega*np.diag(np.arange(Q1.dim)))
-        pulseParams.type = 'state2state'
+        pulseParams.optimType = 'state2state'
         
         #Call the optimization    
         optimize_pulse(pulseParams, systemParams)
@@ -78,9 +78,9 @@ class Test(unittest.TestCase):
         pulseParams.rhoGoal = Q1.levelProjector(1)
         pulseParams.Ugoal = Q1.pauliX
         pulseParams.add_control_line(freq=-Q1.omega, bandwidth=300e6, maxAmp=200e6)
-        pulseParams.add_control_line(freq=-Q1.omega, initialPhase=-np.pi/2, bandwidth=300e6, maxAmp=200e6)
+        pulseParams.add_control_line(freq=-Q1.omega, phase=-np.pi/2, bandwidth=300e6, maxAmp=200e6)
         pulseParams.H_int = Hamiltonian((Q1.omega)*np.diag(np.arange(Q1.dim)))
-        pulseParams.type = 'unitary'
+        pulseParams.optimType = 'unitary'
         pulseParams.derivType = 'finiteDiff'
         
         #Start with a Gaussian
