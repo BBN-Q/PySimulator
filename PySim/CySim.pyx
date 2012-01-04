@@ -49,7 +49,7 @@ cdef extern from "CPPBackEnd.h":
 
     void eval_derivs(OptimParams, SystemParams, complex ***, PropResults, double *)
 
-    double eval_unitary_fitness(OptimParams, PropResults)
+    double eval_pulse_fitness(OptimParams, PropResults)
 
 
 
@@ -66,7 +66,7 @@ cdef class PyPulseSequence(object):
         for ct in range(pulseSeqIn.numControlLines):
             self.thisPtr.controlLines[ct].freq = pulseSeqIn.controlLines[ct].freq
             self.thisPtr.controlLines[ct].phase = pulseSeqIn.controlLines[ct].phase
-        self.thisPtr.controlLines[ct].controlType = 1 if pulseSeqIn.controlLines[ct].controlType=='rotating' else 0
+            self.thisPtr.controlLines[ct].controlType = 1 if pulseSeqIn.controlLines[ct].controlType=='rotating' else 0
         self.thisPtr.H_intPtr = <complex *> np.PyArray_DATA(pulseSeqIn.H_int.matrix) if pulseSeqIn.H_int is not None else NULL
     def __dealloc__(self):
         del self.thisPtr
@@ -91,7 +91,7 @@ cdef class PySystemParams(object):
         self.thisPtr.dissipatorPtrs.resize(len(systemParamsIn.dissipators))
         for ct in range(len(systemParamsIn.dissipators)):
             self.thisPtr.dissipatorPtrs[ct] = <complex*> np.PyArray_DATA(systemParamsIn.dissipators[ct].matrix)
-    def __dealloc(self):
+    def __dealloc__(self):
         del self.thisPtr
 
 
@@ -126,7 +126,7 @@ cdef class PyControlHams_int(object):
 cdef class PyOptimParams(object):
     cdef OptimParams *thisPtr
     def __cinit__(self, optimParamsIn):
-        self.thisPtr = new OptimParams(<complex *> np.PyArray_DATA(optimParamsIn.Ugoal), <complex*> np.PyArray_DATA(optimParamsIn.rhoStart), <complex*> np.PyArray_DATA(optimParamsIn.rhoGoal), optimParamsIn.Ugoal.shape[0], optimParamsIn.dimC2)    
+        self.thisPtr = new OptimParams(<complex *> np.PyArray_DATA(optimParamsIn.Ugoal), <complex*> np.PyArray_DATA(optimParamsIn.rhoStart), <complex*> np.PyArray_DATA(optimParamsIn.rhoGoal), optimParamsIn.dim, optimParamsIn.dimC2)    
         self.thisPtr.numControlLines = optimParamsIn.numControlLines
         self.thisPtr.numTimeSteps = optimParamsIn.numTimeSteps
         self.thisPtr.timeStepsPtr = <double *> np.PyArray_DATA(optimParamsIn.timeSteps)
@@ -166,7 +166,7 @@ def Cy_eval_pulse(PyOptimParams optimParamsIn, PySystemParams systemParamsIn, Py
     opt_evolve_propagator_CPP(deref(optimParamsIn.thisPtr), deref(systemParamsIn.thisPtr), controlHams_int.dataPtrs, deref(propResults.thisPtr))
     
     #Calculate the goodness
-    return eval_unitary_fitness(deref(optimParamsIn.thisPtr), deref(propResults.thisPtr))
+    return eval_pulse_fitness(deref(optimParamsIn.thisPtr), deref(propResults.thisPtr))
 
 #Pass-thru function to evaluate the derivatives of a pulse
 def Cy_eval_derivs(PyOptimParams optimParamsIn, PySystemParams systemParamsIn, PyControlHams_int controlHams_int, PyPropResults propResults):

@@ -44,6 +44,20 @@ class PulseParams(PulseSequence):
         self.maxfun = 15000
         self.derivType = 'approx'
         self.optimType = 'unitary' #uniary or state2state optimization
+        self.Ugoal = None
+        self.rhoStart = None
+        self.rhoGoal = None
+    
+    @property
+    def dim(self):
+        if self.Ugoal is not None:
+            return self.Ugoal.shape[0]
+        else:
+            if self.rhoStart is not None:
+                return self.rhoStart.shape[0]
+            else:
+                return 0
+                
 
 def create_random_pulse(numChannels, numPoints):
     '''

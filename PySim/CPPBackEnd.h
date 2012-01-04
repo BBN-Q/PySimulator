@@ -9,6 +9,7 @@
 #include <vector>
 #include <complex>
 #include <math.h>
+#include <stdio.h>
 
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
@@ -145,7 +146,7 @@ void opt_evolve_propagator_CPP(const OptimParams & optimParams, const SystemPara
 void eval_derivs(const OptimParams & optimParams, const SystemParams & systemParams, cdouble *** controlHams_int, PropResults & propResults, double * derivsPtr);
 
 //Helper function to calculate the fitness of a simulated unitary
-double eval_unitary_fitness(const OptimParams &, const PropResults &);
+double eval_pulse_fitness(const OptimParams &, const PropResults &);
 
 
 #endif /* CPPBACKEND_H__ */

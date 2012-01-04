@@ -17,12 +17,6 @@ public:
 };
 
 
-//Helper function to calculate the fitness of a simulated unitary
-double eval_unitary_fitness(const OptimParams & optimParams, const PropResults & propResults){
-	double tmpResult = abs(optimParams.Ugoal.conjugate().cwiseProduct(propResults.totU).sum());
-	return -(tmpResult*tmpResult)/optimParams.dimC2;
-}
-
 void evolve_propagator_CPP(const PulseSequence & pulseSeq, const SystemParams & systemParams, const int & simType, cdouble * totPropPtr){
 	/*
 	 * Propagate evolution through a pulse sequence.
@@ -101,7 +95,6 @@ void evolve_propagator_CPP(const PulseSequence & pulseSeq, const SystemParams & 
 				else{
 					Htot += controlAmps(controlct, timect)*(cos(tmpPhase)*controlHams[controlct].inphase + sin(tmpPhase)*controlHams[controlct].quadrature);
 				}
-
 			}
 
 			//If necessary move into the interaction frame
@@ -124,12 +117,36 @@ void evolve_propagator_CPP(const PulseSequence & pulseSeq, const SystemParams & 
 				//Using Pade approximant
 				totProp = (subTimeStep*(i*TWOPI*supHtot + supDis)).exp()*totProp;
 			}
+
 			//Update the times
 			tmpTime += subTimeStep;
 			curTime += subTimeStep;
 		}
 	}
 }
+
+//Helper function to calculate the fitness of a simulated unitary
+double eval_pulse_fitness(const OptimParams & optimParams, const PropResults & propResults){
+	double fitness, tmpResult;
+	switch (optimParams.optimType) {
+		//Unitary
+		case 0: {
+			tmpResult = abs(optimParams.Ugoal.conjugate().cwiseProduct(propResults.totU).sum());
+			fitness = (tmpResult*tmpResult)/optimParams.dimC2;
+			break;
+		}
+		//state2state
+		case 1: {
+			MatrixXcd rhoOut = propResults.totU*optimParams.rhoStart*propResults.totU.adjoint();
+			tmpResult = abs(rhoOut.conjugate().cwiseProduct(optimParams.rhoGoal).sum());
+			fitness = tmpResult*tmpResult;
+			break;
+		}
+	}
+
+	return -fitness;
+}
+
 
 //Helper function to evolve the unitary propagator for optimal control.
 //This stores all intermediate results in propResults structure
@@ -161,7 +178,6 @@ void opt_evolve_propagator_CPP(const OptimParams & optimParams, const SystemPara
     for (int timect = 0; timect < optimParams.numTimeSteps; ++timect) {
     	//Initialize the Hamiltonian to the drift Hamiltonian in the appropriate frame
     	Htot = (optimParams.H_intPtr != NULL) ? move2interaction_frame(H_int, curTime, Hnat) : Hnat;
-
     	//Add each of the control Hamiltonians
     	for (size_t controlct = 0; controlct < optimParams.numControlLines; ++controlct) {
     		Htot += controlAmps(controlct,timect)*Map<MatrixXcd>(controlHams_int[controlct][timect], dim, dim);
@@ -169,13 +185,14 @@ void opt_evolve_propagator_CPP(const OptimParams & optimParams, const SystemPara
 
     	//Propagate the unitary
     	propResults.totHams[timect] = Htot;
+
 		SelfAdjointEigenSolver<MatrixXcd> es(Htot);
    		propResults.Ds[timect] = es.eigenvalues();
    		propResults.Vs[timect] = es.eigenvectors();
    		propResults.Us[timect] = propResults.Vs[timect]*((-i*TWOPI*timeSteps[timect]*propResults.Ds[timect]).array().exp().matrix().replicate(1,dim).cwiseProduct(propResults.Vs[timect].adjoint()));
    		propResults.Uforward[timect+1] = propResults.Us[timect]*propResults.Uforward[timect];
     }
-    propResults.totU = propResults.Uforward[optimParams.numTimeSteps];
+    propResults.totU = propResults.Uforward.back();
 }
 
 void eval_derivs(const OptimParams & optimParams, const SystemParams & systemParams, cdouble *** controlHams_int, PropResults & propResults, double * derivsPtr){
