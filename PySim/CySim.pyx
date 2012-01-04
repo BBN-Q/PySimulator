@@ -7,6 +7,7 @@ import numpy as np
 from cython.operator cimport dereference as deref
 from libc.stdlib cimport malloc, free
 
+#Load some classes and functions from the C++ backend.  We use these classes for passing data back and forth between Python and C++
 cdef extern from "CPPBackEnd.h":
     cdef cppclass ControlLine:
         double freq
@@ -53,6 +54,9 @@ cdef extern from "CPPBackEnd.h":
 
 
 
+#Python versions of the classes that will be accessible from Python. 
+#Basically we pass the class a Python version of itself and it initializes a C++ version that can be passed to
+#the C++ back end.
 cdef class PyPulseSequence(object):
     cdef PulseSequence *thisPtr 
     def __cinit__(self, pulseSeqIn):
@@ -95,7 +99,8 @@ cdef class PySystemParams(object):
         del self.thisPtr
 
 
-#Hold pointer to the interaction frame control Hamiltonians    
+#Hold pointer to the interaction frame control Hamiltonians 
+#TODO: This is ugly.  Better to have a vector<vector<Mapcd>>  
 cdef class PyControlHams_int(object):
     cdef complex *** dataPtrs
     cdef size_t dim
@@ -151,7 +156,8 @@ cdef class PyOptimParams(object):
         def __set__(self, controlAmps):
             self.thisPtr.controlAmpsPtr = <double *> np.PyArray_DATA(controlAmps)
 
-        
+#This class basically holds all the propagator evolution results for the optimization so that 
+#we don't have to reallocate memory each iteration.   
 cdef class PyPropResults:
     cdef PropResults *thisPtr
     def __cinit__(self, numTimeSteps, dim):
@@ -178,6 +184,7 @@ def Cy_eval_derivs(PyOptimParams optimParamsIn, PySystemParams systemParamsIn, P
             
     return -derivs.flatten()
 
+#Pass-thru function to evaluate the evolution propagator for either unitary or lindblad.
 def Cy_evolution(pulseSeqIn, systemParamsIn, simType):
     
     #Some error checking

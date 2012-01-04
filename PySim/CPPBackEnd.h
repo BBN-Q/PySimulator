@@ -37,6 +37,7 @@ typedef Map<MatrixXcd> Mapcd;
 
 
 //Some classes/structures to nicely store the data
+
 class ControlHam
 {
 public:
