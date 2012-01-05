@@ -65,12 +65,17 @@ cdef class PyPulseSequence(object):
         self.thisPtr.numTimeSteps = pulseSeqIn.numTimeSteps
         self.thisPtr.timeStepsPtr = <double *> np.PyArray_DATA(pulseSeqIn.timeSteps)
         self.thisPtr.maxTimeStep = pulseSeqIn.maxTimeStep
+        #Error check for data ordering
+        assert pulseSeqIn.controlAmps.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for controlAmps for passing data to C++. Use np.copy(order='C')."
         self.thisPtr.controlAmpsPtr = <double *> np.PyArray_DATA(pulseSeqIn.controlAmps)
         self.thisPtr.controlLines.resize(pulseSeqIn.numControlLines)
         for ct in range(pulseSeqIn.numControlLines):
             self.thisPtr.controlLines[ct].freq = pulseSeqIn.controlLines[ct].freq
             self.thisPtr.controlLines[ct].phase = pulseSeqIn.controlLines[ct].phase
             self.thisPtr.controlLines[ct].controlType = 1 if pulseSeqIn.controlLines[ct].controlType=='rotating' else 0
+        #Error check for data ordering
+        if pulseSeqIn.H_int is not None: 
+            assert pulseSeqIn.H_int.matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for H_int for passing data to C++. Use np.copy(order='C')."
         self.thisPtr.H_intPtr = <complex *> np.PyArray_DATA(pulseSeqIn.H_int.matrix) if pulseSeqIn.H_int is not None else NULL
     def __dealloc__(self):
         del self.thisPtr
@@ -78,22 +83,33 @@ cdef class PyPulseSequence(object):
     #Setter to update the control amplitudes
     property controlAmps:
         def __set__(self, controlAmps):
+            #Error check for data ordering
+            assert controlAmps.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for controlAmps for passing data to C++. Use np.copy(order='C')."
             self.thisPtr.controlAmpsPtr = <double *> np.PyArray_DATA(controlAmps)
 
         
 cdef class PySystemParams(object):
     cdef SystemParams *thisPtr
     def __cinit__(self, systemParamsIn):
-        self.thisPtr = new SystemParams()    
+        self.thisPtr = new SystemParams()
+        #Error check for data ordering
+        assert systemParamsIn.Hnat.matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for Hnat for passing data to C++. Use np.copy(order='C')."
         self.thisPtr.HnatPtr = <complex *> np.PyArray_DATA(systemParamsIn.Hnat.matrix)
         self.thisPtr.numControlHams = systemParamsIn.numControlHams
         self.thisPtr.dim = systemParamsIn.dim
         self.thisPtr.controlHams.resize(systemParamsIn.numControlHams)
         for ct in range(systemParamsIn.numControlHams):
+            #Error check for data ordering
+            assert systemParamsIn.controlHams[ct]['inphase'].matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for inphase controlHams for passing data to C++. Use np.copy(order='C')."
             self.thisPtr.controlHams[ct].inphasePtr = <complex*> np.PyArray_DATA(systemParamsIn.controlHams[ct]['inphase'].matrix)
+            #Error check for data ordering
+            assert systemParamsIn.controlHams[ct]['quadrature'].matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for quadrature controlHams for passing data to C++. Use np.copy(order='C')."
             self.thisPtr.controlHams[ct].quadraturePtr = <complex*> np.PyArray_DATA(systemParamsIn.controlHams[ct]['quadrature'].matrix) if systemParamsIn.controlHams[ct]['quadrature'] is not None else NULL
+
         self.thisPtr.dissipatorPtrs.resize(len(systemParamsIn.dissipators))
         for ct in range(len(systemParamsIn.dissipators)):
+            #Error check for data ordering
+            assert systemParamsIn.dissipators[ct].matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for dissipators for passing data to C++. Use np.copy(order='C')."
             self.thisPtr.dissipatorPtrs[ct] = <complex*> np.PyArray_DATA(systemParamsIn.dissipators[ct].matrix)
     def __dealloc__(self):
         del self.thisPtr
@@ -118,6 +134,8 @@ cdef class PyControlHams_int(object):
         for controlct in range(self.numControlHams):
             self.dataPtrs[controlct] = <complex **> malloc(self.numTimeSteps * sizeof(complex *))
             for timect in range(self.numTimeSteps):
+                #Error check for data ordering
+                assert controlHams_int[controlct, timect].flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for controlHams_int for passing data to C++. Use np.copy(order='C')."
                 self.dataPtrs[controlct][timect] = <complex*> np.PyArray_DATA(controlHams_int[controlct, timect])
                 
     def __dealloc__(self):
@@ -131,17 +149,25 @@ cdef class PyControlHams_int(object):
 cdef class PyOptimParams(object):
     cdef OptimParams *thisPtr
     def __cinit__(self, optimParamsIn):
+        #Error check for data ordering
+        assert optimParamsIn.Ugoal.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for Ugoal for passing data to C++. Use np.copy(order='C')."
+        assert optimParamsIn.rhoStart.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for rhoStart for passing data to C++. Use np.copy(order='C')."
+        assert optimParamsIn.rhoGoal.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for rhoGoal for passing data to C++. Use np.copy(order='C')."
         self.thisPtr = new OptimParams(<complex *> np.PyArray_DATA(optimParamsIn.Ugoal), <complex*> np.PyArray_DATA(optimParamsIn.rhoStart), <complex*> np.PyArray_DATA(optimParamsIn.rhoGoal), optimParamsIn.dim, optimParamsIn.dimC2)    
         self.thisPtr.numControlLines = optimParamsIn.numControlLines
         self.thisPtr.numTimeSteps = optimParamsIn.numTimeSteps
         self.thisPtr.timeStepsPtr = <double *> np.PyArray_DATA(optimParamsIn.timeSteps)
         self.thisPtr.maxTimeStep = optimParamsIn.maxTimeStep
+        assert optimParamsIn.controlAmps.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for controlAmps for passing data to C++. Use np.copy(order='C')."
         self.thisPtr.controlAmpsPtr = <double *> np.PyArray_DATA(optimParamsIn.controlAmps)
         self.thisPtr.controlLines.resize(optimParamsIn.numControlLines)
         for ct in range(optimParamsIn.numControlLines):
             self.thisPtr.controlLines[ct].freq = optimParamsIn.controlLines[ct].freq
             self.thisPtr.controlLines[ct].phase = optimParamsIn.controlLines[ct].phase
         self.thisPtr.controlLines[ct].controlType = 1 if optimParamsIn.controlLines[ct].controlType=='rotating' else 0
+        #Error check for data ordering
+        if optimParamsIn.H_int is not None: 
+            assert optimParamsIn.H_int.matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for H_int for passing data to C++. Use np.copy(order='C')."
         self.thisPtr.H_intPtr = <complex *> np.PyArray_DATA(optimParamsIn.H_int.matrix) if optimParamsIn.H_int is not None else NULL
         derivTypeMap = {'finiteDiff':0, 'approx':1, 'exact':2}
         self.thisPtr.derivType = derivTypeMap[optimParamsIn.derivType]
@@ -154,6 +180,8 @@ cdef class PyOptimParams(object):
     #Setter to update the control amplitudes
     property controlAmps:
         def __set__(self, controlAmps):
+            #Error check for data ordering
+            assert controlAmps.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for controlAmps for passing data to C++. Use np.copy(order='C')."
             self.thisPtr.controlAmpsPtr = <double *> np.PyArray_DATA(controlAmps)
 
 #This class basically holds all the propagator evolution results for the optimization so that 
