@@ -150,16 +150,20 @@ cdef class PyOptimParams(object):
     cdef OptimParams *thisPtr
     def __cinit__(self, optimParamsIn):
         #Error check for data ordering
-        assert optimParamsIn.Ugoal.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for Ugoal for passing data to C++. Use np.copy(order='C')."
-        assert optimParamsIn.rhoStart.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for rhoStart for passing data to C++. Use np.copy(order='C')."
-        assert optimParamsIn.rhoGoal.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for rhoGoal for passing data to C++. Use np.copy(order='C')."
+        if optimParamsIn.Ugoal is not None:
+            assert optimParamsIn.Ugoal.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for Ugoal for passing data to C++. Use np.copy(order='C')."
+        if optimParamsIn.rhoStart is not None:
+            assert optimParamsIn.rhoStart.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for rhoStart for passing data to C++. Use np.copy(order='C')."
+        if optimParamsIn.rhoGoal is not None:         
+            assert optimParamsIn.rhoGoal.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for rhoGoal for passing data to C++. Use np.copy(order='C')."
         self.thisPtr = new OptimParams(<complex *> np.PyArray_DATA(optimParamsIn.Ugoal), <complex*> np.PyArray_DATA(optimParamsIn.rhoStart), <complex*> np.PyArray_DATA(optimParamsIn.rhoGoal), optimParamsIn.dim, optimParamsIn.dimC2)    
         self.thisPtr.numControlLines = optimParamsIn.numControlLines
         self.thisPtr.numTimeSteps = optimParamsIn.numTimeSteps
         self.thisPtr.timeStepsPtr = <double *> np.PyArray_DATA(optimParamsIn.timeSteps)
         self.thisPtr.maxTimeStep = optimParamsIn.maxTimeStep
-        assert optimParamsIn.controlAmps.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for controlAmps for passing data to C++. Use np.copy(order='C')."
-        self.thisPtr.controlAmpsPtr = <double *> np.PyArray_DATA(optimParamsIn.controlAmps)
+        if optimParamsIn.controlAmps is not None:
+            assert optimParamsIn.controlAmps.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for controlAmps for passing data to C++. Use np.copy(order='C')."
+            self.thisPtr.controlAmpsPtr = <double *> np.PyArray_DATA(optimParamsIn.controlAmps)
         self.thisPtr.controlLines.resize(optimParamsIn.numControlLines)
         for ct in range(optimParamsIn.numControlLines):
             self.thisPtr.controlLines[ct].freq = optimParamsIn.controlLines[ct].freq
