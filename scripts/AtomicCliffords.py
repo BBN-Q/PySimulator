@@ -4,6 +4,8 @@ Created on Thu Feb  9 21:30:03 2012
 Test script to play around with the single pulse single qubit Clifford gates achieved via phase-ramping.
 """
 
+from __future__ import division
+
 import numpy as np
 
 from scipy.constants import pi
@@ -40,8 +42,7 @@ basePulseSeq.H_int = None
 #Some parameters for the pulse
 timeStep = 1/1.2e9
 #How many discrete timesteps to break it up into
-stepsArray = np.arange(3,61)
-
+stepsArray = np.arange(12,61)
 
 
 '''
@@ -49,17 +50,18 @@ Test a square Hadamard pulse.
 '''
 
 #Setup the pulseSequences
-pulseSeqs = []
+#pulseSeqs = []
 #
 #for numSteps in stepsArray:
 #    tmpPulseSeq = deepcopy(basePulseSeq)
 #    timePts = np.arange(0, numSteps*timeStep, timeStep)
 #    calScale = 0.5/np.sqrt(2)/np.sum(timeStep*np.ones(numSteps))
-#    phaseRamp = 2*pi*calScale*np.cumsum(timeStep*np.ones(numSteps))
-#    phaseCorr = phaseRamp[-1]
-#    #Choose average phase for each time-step by taking difference between subsequent points
-#    phaseRamp -= np.diff(np.hstack((0, phaseRamp)))/2
-#    
+#    #First order Trotter
+##    phaseStep = pi/np.sqrt(2)/numSteps
+##    phaseRamp = phaseStep*(np.arange(numSteps))
+#    #Second order Trotter
+#    phaseStep = pi/np.sqrt(2)/numSteps/2
+#    phaseRamp = phaseStep*(2*np.arange(numSteps)+1)
 #    complexPulse = calScale*np.exp(-1j*phaseRamp)
 #    tmpPulseSeq.controlAmps = np.vstack((complexPulse.real, complexPulse.imag))
 #    tmpPulseSeq.timeSteps = timeStep*np.ones(numSteps)
@@ -72,34 +74,29 @@ pulseSeqs = []
 Test a Gaussian ampitude profile (with potential DRAG correction).
 '''
 pulseSeqs = []
+phaseCorrArr = []
 for numSteps in stepsArray:
     tmpPulseSeq = deepcopy(basePulseSeq)
     xPts = np.linspace(-2,2,numSteps)
     gaussPulse = np.exp(-0.5*(xPts**2)) - np.exp(-0.5*2**2)
-    DRAGPulse = -0.1*(1.0/qubit.delta)*(4.0/(numSteps*timeStep))*(-xPts*np.exp(-0.5*(xPts**2)))
-
+    DRAGPulse = -0*(1/2/2/pi/qubit.delta)*(4.0/(numSteps*timeStep))*(-xPts*np.exp(-0.5*(xPts**2)))
+    
     timePts = np.arange(0, numSteps*timeStep, timeStep)
     calScale = 0.5/np.sqrt(2)/np.sum(timeStep*gaussPulse)
-    phaseRamp = 2*pi*calScale*np.cumsum(timeStep*gaussPulse)  
-    #Optional DRAG correction
-    delta = 0
-    phaseRamp += delta*0.25*(1/qubit.delta)*np.cumsum(timeStep*(2*pi*calScale*gaussPulse)**2)    
-    #Final change in frame
-    phaseCorr = phaseRamp[-1]
-    
-    #Choose average phase for each time-step by taking difference between subsequent points
-    phaseRamp -= np.diff(np.hstack((0, phaseRamp)))/2
 
-    
+    phaseSteps = 2*pi*calScale*timeStep*gaussPulse
+
+    #Optional Z DRAG correction
+    phaseSteps += 0*-0.5*(1/2/pi/qubit.delta)*timeStep*(2*pi*calScale*gaussPulse)**2   
+
+    phaseRamp = np.cumsum(phaseSteps) - phaseSteps/2
+
+    phaseCorrArr.append(np.sum(phaseSteps))
     complexPulse = calScale*(gaussPulse+1j*DRAGPulse)*np.exp(-1j*phaseRamp)
     tmpPulseSeq.controlAmps = np.vstack((complexPulse.real, complexPulse.imag))
     tmpPulseSeq.timeSteps = timeStep*np.ones(numSteps)
     
     pulseSeqs.append(tmpPulseSeq)
-
-
-
-
 
 
 results = simulate_sequence_stack(pulseSeqs, systemParams, rhoIn, simType='unitary')
@@ -115,13 +112,16 @@ I = np.eye(2)
 UgoalQ = expm(-1j*(pi/2)*(1/np.sqrt(2))*(X+Z))
 Ugoal = np.zeros((qubit.dim,qubit.dim), dtype=np.complex128)
 Ugoal[0:2,0:2] = UgoalQ
+#Ugoal = qubit.pauliX
 
-fidelity = [np.abs(np.trace(np.dot(Ugoal.conj().transpose(), np.dot(expm(-1j*(phaseCorr/2)*qubit.pauliZ),tmpU))))**2/4 for tmpU in results[1]]
+#phaseCorr = pi/np.sqrt(2)
+#fidelity = [np.abs(np.trace(np.dot(Ugoal.conj().transpose(), np.dot(expm(-1j*(phaseCorr/2)*qubit.pauliZ),tmpU))))**2/4 for tmpU in results[1]]
+fidelity = [np.abs(np.trace(np.dot(Ugoal.conj().transpose(), np.dot(expm(-1j*(phaseCorr/2)*qubit.pauliZ),tmpU))))**2/4 for (tmpU,phaseCorr) in zip(results[1],phaseCorrArr)]
 
+print(1-fidelity[-1])
 plt.figure()
 plt.semilogy(stepsArray*timeStep,1-np.array(fidelity))
 plt.xlabel('Length of Pulse')
 plt.ylabel('Gate Error (after Z-correction)')
 #plt.savefig('/home/cryan/Desktop/junk.pdf')
 plt.show()
-print(fidelity[-1])
