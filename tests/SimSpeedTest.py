@@ -35,7 +35,7 @@ def expm_eigen(matIn, mult):
     '''
     dim = matIn.shape[0]
     D, V = eigh(matIn)
-    return np.dot(V, np.exp(mult*D).repeat(dim).reshape((dim, dim))*V.conj().T), D, V
+    return V.dot(np.diag(np.exp(mult*D))).dot(V.conj().T)
 
 #@jit(c16[:,:](c16[:,:], c16[:,:,:], f8[:,:], f8[:]))
 #@autojit
