@@ -31,7 +31,7 @@ systemParams.add_sub_system(Q1)
 Q2 = SCQubit(numLevels=3, omega=329.8e6, delta=-314.4e6, name='Q2', T1=4.4e-6)
 systemParams.add_sub_system(Q2)
 
-#Add a 2MHz ZZ interaction 
+#Add a 2MHz ZZ interaction through a flip-flop interaction 
 systemParams.add_interaction('Q1', 'Q2', 'FlipFlop', 4.3e6)
 
 #Create the full Hamiltonian   
@@ -40,7 +40,7 @@ systemParams.create_full_Ham()
 #Calculate the eigenframe for the natural Hamiltonian
 d,v = eigh(systemParams.Hnat.matrix)
 
-#Reorder the the transformation matrix
+#Reorder the transformation matrix to maintain the computational basis ordering
 sortOrder = np.argsort(np.argmax(np.abs(v),axis=0))
 v = v[:, sortOrder]
 systemParams.Hnat.matrix = np.complex128(np.diag(d[sortOrder]))

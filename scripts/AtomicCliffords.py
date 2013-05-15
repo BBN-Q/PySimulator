@@ -40,9 +40,10 @@ basePulseSeq.add_control_line(freq=0e9, phase=pi/2)
 basePulseSeq.H_int = None
 
 #Some parameters for the pulse
-timeStep = 1/1.2e9
+timeStep = 0.5/1.2e9
 #How many discrete timesteps to break it up into
-stepsArray = np.arange(12,61)
+#stepsArray = np.arange(12,61)
+stepsArray = np.arange(24,121)
 
 
 '''
@@ -87,12 +88,12 @@ for numSteps in stepsArray:
     phaseSteps = 2*pi*calScale*timeStep*gaussPulse
 
     #Optional Z DRAG correction
-    phaseSteps += 0*-0.5*(1/2/pi/qubit.delta)*timeStep*(2*pi*calScale*gaussPulse)**2   
+    phaseSteps += 1*-0.5*(1/2/pi/qubit.delta)*timeStep*(2*pi*calScale*gaussPulse)**2   
 
     phaseRamp = np.cumsum(phaseSteps) - phaseSteps/2
 
     phaseCorrArr.append(np.sum(phaseSteps))
-    complexPulse = calScale*(gaussPulse+1j*DRAGPulse)*np.exp(-1j*phaseRamp)
+    complexPulse = calScale*(gaussPulse+1j*DRAGPulse)*np.exp(-1j*phaseRam
     tmpPulseSeq.controlAmps = np.vstack((complexPulse.real, complexPulse.imag))
     tmpPulseSeq.timeSteps = timeStep*np.ones(numSteps)
     
@@ -122,6 +123,19 @@ print(1-fidelity[-1])
 plt.figure()
 plt.semilogy(stepsArray*timeStep,1-np.array(fidelity))
 plt.xlabel('Length of Pulse')
-plt.ylabel('Gate Error (after Z-correction)')
+plt.ylabel('Gate Error (after frame-correction)')
 #plt.savefig('/home/cryan/Desktop/junk.pdf')
+plt.show()
+
+
+plt.figure()
+plt.semilogy(timeStep*stepsArray, 1-fidelities_noDrag)
+plt.semilogy(timeStep*stepsArray, 1-fidelities_ZDrag)
+plt.semilogy(0.5*timeStep*np.arange(24,121), 1-fidelities_ZDragDDR)
+plt.semilogy(timeStep*stepsArray, 1-fidelities_ZDragX180)
+plt.legend(('Hadamard, No DRAG', 'Hadamard, Z DRAG', 'Hadamard, Z DRAG, DDR', 'X180, Z DRAG'))
+plt.xlabel('Pulse Length (s)', fontsize=14)
+plt.ylabel('Gate Fidelity', fontsize=14)
+plt.title('Hadamard Atomic Clifford Gate Fidelities', fontsize=16)
+plt.savefig('AtomicHadamard.svg')
 plt.show()

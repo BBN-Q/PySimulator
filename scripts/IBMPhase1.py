@@ -33,7 +33,6 @@ systemParams.add_sub_system(Q1)
 Q2 = SCQubit(numLevels=3, omega=5.34012e9, delta=-224e6, name='Q2', T1=10e-6)
 systemParams.add_sub_system(Q2)
 
-
 #Add an interaction between the qubits to get the the cross-resonance effect 
 systemParams.add_interaction('Q1', 'Q2', 'FlipFlop', 2e6)
 

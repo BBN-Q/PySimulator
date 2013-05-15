@@ -18,8 +18,8 @@ from PySim.QuantumSystems import SCQubit, Hamiltonian, Dissipator
 
 from numba import *
 
-import matplotlib.pyplot as plt
-from timeit import timeit
+#import matplotlib.pyplot as plt
+#from timeit import timeit
 
 #Try to load the CPPBackEnd
 try:
@@ -37,8 +37,36 @@ def expm_eigen(matIn, mult):
     D, V = eigh(matIn)
     return np.dot(V, np.exp(mult*D).repeat(dim).reshape((dim, dim))*V.conj().T), D, V
 
-#@jit(c16[:,:](c16[:,:], c16[:,:,:], f8[:,:], f8[:]))
+@autojit()
+def mult_a_X(alpha, X):
+    outArray = np.zeros_like(X)
+    for rowct in range(X.shape[0]):
+        for colct in range(X.shape[1]):
+            outArray[rowct,colct] = alpha*X[rowct, colct]
+    return outArray
+
+@jit(c16[:,:](c16[:,:], c16[:,:,:], f8[:,:], f8[:]))
 #@autojit
+def evolution_numba(Hnat, controlHams, controlFields, controlFreqs):
+    
+    timeStep = 0.01
+    curTime = 0.0
+    
+    Uprop = np.eye(Hnat.shape[0])
+    for timect in range(controlFields.shape[1]):
+        tmpH = np.copy(Hnat)
+        for controlct in range(controlFields.shape[0]):
+            tmpMult = controlFields[controlct, timect]*cos(2*pi*curTime*controlFreqs[controlct])
+            for rowct in range(tmpH.shape[0]):
+                for colct in range(tmpH.shape[1]):
+                    tmpH[rowct,colct] += tmpMult*controlHams[controlct, rowct, colct]
+        
+        Uprop = np.dot(expm_eigen(tmpH,-1j*2*pi*timeStep)[0],Uprop)
+        curTime += timeStep
+        
+    return Uprop
+
+
 def evolution_numpy(Hnat, controlHams, controlFields, controlFreqs):
     
     timeStep = 0.01
@@ -54,13 +82,6 @@ def evolution_numpy(Hnat, controlHams, controlFields, controlFreqs):
         curTime += timeStep
         
     return Uprop
-
-@autojit()
-def sum1d(my_double_array):
-    sum = 0.0
-    for i in range(my_double_array.shape[0]):
-        sum += my_double_array[i]
-    return sum
 
 def sim_setup(dimension, numTimeSteps, numControls):
     #Create a random natural hamiltonian 
@@ -100,21 +121,25 @@ def sim_setup_cython(Hnat, controlHams, controlFields, controlFreqs):
 if __name__ == '__main__':
     
     dims = 2**np.arange(1,6)
-    cythonTimes = []
-    numpyTimes = []
-    for dim in dims:
-        print(dim)
-        Hnat, controlHams, controlFields, controlFreqs = sim_setup(dim, 2000, 4)
-        systemParams, pulseSeq = sim_setup_cython(Hnat, controlHams, controlFields, controlFreqs)
-        numpyTimes.append(timeit('evolution_numpy(Hnat, controlHams, controlFields, controlFreqs)', 
-                      setup='from __main__ import evolution_numpy, Hnat, controlHams, controlFields, controlFreqs', number=3)/3)
-        cythonTimes.append(timeit('simulate_sequence(pulseSeq, systemParams)', setup='from __main__ import simulate_sequence, pulseSeq, systemParams', number=3)/3)
-        
-    plt.plot(dims, numpyTimes)
-    plt.plot(dims, cythonTimes)
-    plt.legend(('Numpy', 'Cython'))
-    plt.xlabel('System Dimension')
-    plt.show()
+    dim = 16
+    Hnat, controlHams, controlFields, controlFreqs = sim_setup(dim, 1000, 4)
+    print(evolution_numba(Hnat, controlHams, controlFields, controlFreqs))
+#        systemParams, pulseSeq = sim_setup_cython(Hnat, controlHams, controlFields, controlFreqs)
+#    cythonTimes = []
+#    numpyTimes = []
+#    for dim in dims:
+#        print(dim)
+#        Hnat, controlHams, controlFields, controlFreqs = sim_setup(dim, 2000, 4)
+#        systemParams, pulseSeq = sim_setup_cython(Hnat, controlHams, controlFields, controlFreqs)
+#        numpyTimes.append(timeit('evolution_numpy(Hnat, controlHams, controlFields, controlFreqs)', 
+#                      setup='from __main__ import evolution_numpy, Hnat, controlHams, controlFields, controlFreqs', number=3)/3)
+#        cythonTimes.append(timeit('simulate_sequence(pulseSeq, systemParams)', setup='from __main__ import simulate_sequence, pulseSeq, systemParams', number=3)/3)
+#        
+#    plt.plot(dims, numpyTimes)
+#    plt.plot(dims, cythonTimes)
+#    plt.legend(('Numpy', 'Cython'))
+#    plt.xlabel('System Dimension')
+#    plt.show()
     
     
 
