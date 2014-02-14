@@ -11,6 +11,7 @@ These are the latest versions I have worked with. Nearby versions should be just
 * scipy 0.13
 * Cython 0.20 (for C++ backend) (note Cython 0.16-0.19 had a bug that broke assigning to std::vector)
 * Eigen 3.2 (for C++ backend)
+* scons (for C++ backend)
  
 ## Building C++ Backend
 

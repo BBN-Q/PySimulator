@@ -28,8 +28,9 @@ if debugFlag:
     CyBuilder = env.Command('CySim.cpp','CySim.pyx','cython --cplus --gdb -o $TARGET $SOURCE')
 else:
     if platform.system() == 'Darwin':
-        # warning: march=native doesn't work on GCC 4.2 that comes with OS 10.7
-        env.Append(CPPFLAGS=['-fast', '-ftree-vectorize', '-march=core2'])
+        env['CXX'] ='clang'
+        env.Append(CPPFLAGS=['-std=c++11', '-stdlib=libc++'])
+        env.Append(CPPFLAGS=['-O3', '-march=native'])
     else:
         env.Append(CPPFLAGS=['-O3', '-ffast-math', '-ftree-vectorize', '-march=native'])
     env.Append(CPPDEFINES=['NDEBUG'])
