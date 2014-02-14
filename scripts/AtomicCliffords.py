@@ -22,7 +22,7 @@ from copy import deepcopy
 
  #Setup the system
 systemParams = SystemParams()
-qubit = SCQubit(3, 0e9, delta=200e6, name='Q1', T1=1e-6)
+qubit = SCQubit(2, 0e9, delta=200e6, name='Q1', T1=1e-6)
 systemParams.add_sub_system(qubit)
 systemParams.add_control_ham(inphase = Hamiltonian(0.5*(qubit.loweringOp + qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*qubit.loweringOp + 1j*qubit.raisingOp)))
 systemParams.add_control_ham(inphase = Hamiltonian(0.5*(qubit.loweringOp + qubit.raisingOp)), quadrature = Hamiltonian(0.5*(-1j*qubit.loweringOp + 1j*qubit.raisingOp)))
@@ -40,10 +40,10 @@ basePulseSeq.add_control_line(freq=0e9, phase=pi/2)
 basePulseSeq.H_int = None
 
 #Some parameters for the pulse
-timeStep = 0.5/1.2e9
+timeStep = 1.0/1.2e9
 #How many discrete timesteps to break it up into
-#stepsArray = np.arange(12,61)
-stepsArray = np.arange(24,121)
+stepsArray = np.arange(12,61)
+# stepsArray = np.arange(24,121)
 
 
 '''
@@ -86,14 +86,13 @@ for numSteps in stepsArray:
     calScale = 0.5/np.sqrt(2)/np.sum(timeStep*gaussPulse)
 
     phaseSteps = 2*pi*calScale*timeStep*gaussPulse
-
     #Optional Z DRAG correction
-    phaseSteps += 1*-0.5*(1/2/pi/qubit.delta)*timeStep*(2*pi*calScale*gaussPulse)**2   
+    # phaseSteps += 1*-0.5*(1/2/pi/qubit.delta)*timeStep*(2*pi*calScale*gaussPulse)**2   
 
     phaseRamp = np.cumsum(phaseSteps) - phaseSteps/2
 
     phaseCorrArr.append(np.sum(phaseSteps))
-    complexPulse = calScale*(gaussPulse+1j*DRAGPulse)*np.exp(-1j*phaseRam
+    complexPulse = calScale*(gaussPulse+1j*DRAGPulse)*np.exp(-1j*phaseRamp)
     tmpPulseSeq.controlAmps = np.vstack((complexPulse.real, complexPulse.imag))
     tmpPulseSeq.timeSteps = timeStep*np.ones(numSteps)
     
