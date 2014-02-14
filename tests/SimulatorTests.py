@@ -100,7 +100,7 @@ class SingleQubit(unittest.TestCase):
             plt.figure()
             plt.plot(self.pulseLengths,results)
             plt.plot(self.pulseLengths, expectedResults, color='r', linestyle='--', linewidth=2)
-            plt.title('10MHz Rabi Oscillations in Rotating Frame')
+            plt.title('10MHz Rabi Oscillations in Interaction Frame')
             plt.xlabel('Pulse Length')
             plt.ylabel(r'$\sigma_z$')
             plt.legend(('Simulated Results', '10MHz Cosine'))
@@ -351,6 +351,6 @@ if __name__ == "__main__":
     plotResults = True
     
     unittest.main()
-#    singleTest = unittest.TestSuite()
-#    singleTest.addTest(SingleQubit("testYPhase"))
-#    unittest.TextTestRunner(verbosity=2).run(singleTest)
+    # singleTest = unittest.TestSuite()
+    # singleTest.addTest(SingleQubit("testRabiRotatingFrame"))
+    # unittest.TextTestRunner(verbosity=2).run(singleTest)

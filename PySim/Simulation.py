@@ -21,7 +21,10 @@ def simulate_sequence(pulseSeq=None, systemParams=None, rhoIn=None, simType='uni
     '''
     if simType == 'unitary':
         totProp = evolution_unitary(pulseSeq, systemParams)
-        rhoOut = np.dot(np.dot(totProp,rhoIn), totProp.conj().transpose())
+        if rhoIn is not None:
+            rhoOut = np.dot(np.dot(totProp,rhoIn), totProp.conj().transpose())
+        else:
+            rhoOut = None
     elif simType == 'lindblad':
         totProp = evolution_lindblad(pulseSeq, systemParams, rhoIn)
         #Reshape, propagate and reshape again the density matrix
