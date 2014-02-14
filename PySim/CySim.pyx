@@ -107,11 +107,11 @@ cdef class PySystemParams(object):
                 assert systemParamsIn.controlHams[ct]['quadrature'].matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for quadrature controlHams for passing data to C++. Use np.copy(order='C')."
             self.thisPtr.controlHams[ct].quadraturePtr = <complex*> np.PyArray_DATA(systemParamsIn.controlHams[ct]['quadrature'].matrix) if systemParamsIn.controlHams[ct]['quadrature'] is not None else NULL
 
-#        self.thisPtr.dissipatorPtrs.resize(len(systemParamsIn.dissipators))
-#        for ct in range(len(systemParamsIn.dissipators)):
-#            #Error check for data ordering
-#            assert systemParamsIn.dissipators[ct].matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for dissipators for passing data to C++. Use np.copy(order='C')."
-#            self.thisPtr.dissipatorPtrs[ct] = <complex*> np.PyArray_DATA(systemParamsIn.dissipators[ct].matrix)
+        self.thisPtr.dissipatorPtrs.resize(len(systemParamsIn.dissipators))
+        for ct in range(len(systemParamsIn.dissipators)):
+            #Error check for data ordering
+            assert systemParamsIn.dissipators[ct].matrix.flags['C_CONTIGUOUS'], "Uhoh! We need row-major ordering for dissipators for passing data to C++. Use np.copy(order='C')."
+            self.thisPtr.dissipatorPtrs[ct] = <complex*> np.PyArray_DATA(systemParamsIn.dissipators[ct].matrix)
  
     def __dealloc__(self):
         del self.thisPtr
